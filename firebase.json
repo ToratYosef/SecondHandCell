@@ -30,12 +30,17 @@
   "storage": {
     "rules": "storage.rules"
   },
-  "hosting": {
-    "public": "/workspaces/SecondHandCell/apps/web/src/app/(site)",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
-  }
+  "hosting": [
+    {
+      "source": "apps/web",
+      "frameworksBackend": {
+        "codebase": "web",
+        "region": "us-central1"
+      },
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" install",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ]
 }
