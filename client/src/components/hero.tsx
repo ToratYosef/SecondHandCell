@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Shield, Zap, DollarSign, Send } from "lucide-react";
+import { ArrowRight, Shield, Zap, DollarSign, Send, Headset } from "lucide-react";
 import heroImage from "@assets/generated_images/Hero_smartphones_collection_image_d95e8608.png";
 import Logo from "@/assets/logo.svg";
 
@@ -52,11 +52,11 @@ export function Hero() {
           </Link>
         </div>
 
-        <div className="flex flex-wrap gap-8 justify-center items-center text-white/80 text-sm">
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            <span>We never accept blacklisted devices</span>
-          </div>
+          <div className="flex flex-wrap gap-8 justify-center items-center text-white/80 text-sm">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              <span>We never accept blacklisted devices</span>
+            </div>
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5" />
             <span>Instant quotes &amp; ShipEngine-ready labels</span>
@@ -65,11 +65,15 @@ export function Hero() {
             <DollarSign className="h-5 w-5" />
             <span>Payouts processed within 2 business days</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Send className="h-5 w-5" />
-            <span>$10 shipping kit option includes inbound &amp; outbound labels</span>
+            <div className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              <span>$10 shipping kit option includes inbound &amp; outbound labels</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Headset className="h-5 w-5" />
+              <span>Live support with real-time typing previews</span>
+            </div>
           </div>
-        </div>
       </div>
     </section>
   );

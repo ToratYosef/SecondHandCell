@@ -16,9 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Quote, QuoteWorkflow, WorkflowLabel, ReminderStatus } from "@shared/schema";
+import { SupportConsole } from "./support-console";
 import {
   MailCheck,
   Ship,
@@ -34,6 +37,7 @@ import {
   ShieldCheck,
   CheckCircle2,
 } from "lucide-react";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 
 interface PatchPayload {
   id: string;
@@ -357,6 +361,47 @@ export function AdminDashboard() {
     return { total, pending, kits, awaitingReturn };
   }, [quotes]);
 
+  const analytics = useMemo(() => {
+    if (!quotes || quotes.length === 0) {
+      return { daily: [] as { day: string; orders: number; payout: number }[], shippingKit: 0, emailLabel: 0, pipeline: 0, average: 0 };
+    }
+
+    const dailyMap = new Map<string, { orders: number; payout: number }>();
+    let shippingKit = 0;
+    let pipeline = 0;
+
+    quotes.forEach((quote) => {
+      if (quote.workflow.shippingMethod === "shipping-kit") {
+        shippingKit += 1;
+      }
+      pipeline += quote.workflow.totalDue;
+
+      const key = format(new Date(quote.createdAt), "yyyy-MM-dd");
+      const entry = dailyMap.get(key) ?? { orders: 0, payout: 0 };
+      entry.orders += 1;
+      entry.payout += quote.workflow.totalDue;
+      dailyMap.set(key, entry);
+    });
+
+    const daily = Array.from(dailyMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-7)
+      .map(([key, entry]) => ({
+        day: format(new Date(key), "MMM d"),
+        orders: entry.orders,
+        payout: Number(entry.payout.toFixed(2)),
+      }));
+
+    const emailLabel = quotes.length - shippingKit;
+    const average = quotes.length ? pipeline / quotes.length : 0;
+
+    return { daily, shippingKit, emailLabel, pipeline, average };
+  }, [quotes]);
+
+  const shippingTotal = analytics.shippingKit + analytics.emailLabel;
+  const kitPercent = shippingTotal ? Math.round((analytics.shippingKit / shippingTotal) * 100) : 0;
+  const emailPercent = shippingTotal ? 100 - kitPercent : 0;
+
   if (isLoading) {
     return (
       <div className="py-20 text-center">
@@ -376,7 +421,7 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
@@ -412,6 +457,79 @@ export function AdminDashboard() {
           <CardContent className="flex items-center justify-between">
             <span className="text-3xl font-bold text-destructive">{stats.awaitingReturn}</span>
             <Undo2 className="h-8 w-8 text-destructive" />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between text-base">
+              Order velocity
+              <span className="text-xs text-muted-foreground">Last 7 days</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {analytics.daily.length ? (
+              <ChartContainer
+                config={{
+                  orders: { label: "Orders", color: "hsl(var(--primary))" },
+                  payout: { label: "Payout", color: "hsl(var(--secondary))" },
+                }}
+                className="h-[260px]"
+              >
+                <LineChart data={analytics.daily}>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} className="stroke-border" />
+                  <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} axisLine={false} tickLine={false} />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <YAxis yAxisId="right" orientation="right" hide />
+                  <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+                  <Line yAxisId="left" type="monotone" dataKey="orders" stroke="var(--color-orders)" strokeWidth={2} dot={false} />
+                  <Line yAxisId="right" type="monotone" dataKey="payout" stroke="var(--color-payout)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ChartContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground">No order history yet to visualize.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Pipeline snapshot</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <div className="rounded-lg border border-border/60 p-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Total payout pipeline</p>
+              <p className="text-2xl font-semibold text-foreground">${analytics.pipeline.toLocaleString()}</p>
+              <p className="text-xs mt-1">Average payout ${analytics.average.toFixed(2)}</p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                <span>Shipping kits</span>
+                <span>{kitPercent}%</span>
+              </div>
+              <Progress value={kitPercent} className="h-2 mt-2" />
+              <p className="mt-1 text-xs">{analytics.shippingKit} orders using $10 kits</p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                <span>Email labels</span>
+                <span>{emailPercent}%</span>
+              </div>
+              <Progress value={emailPercent} className="h-2 mt-2" />
+              <p className="mt-1 text-xs">{analytics.emailLabel} orders on instant labels</p>
+            </div>
+            <p className="text-xs">
+              Keep an eye on kit usage to forecast ShipEngine spend and schedule reminder cadence.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -673,6 +791,18 @@ export function AdminDashboard() {
           </Card>
         )}
       </div>
+
+      <Separator />
+
+      <section className="space-y-6">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-2xl font-semibold text-foreground">Live support control center</h2>
+          <p className="text-muted-foreground">
+            Monitor conversations, preview what customers are typing, and trigger ShipEngine actions without leaving the dashboard.
+          </p>
+        </div>
+        <SupportConsole />
+      </section>
     </div>
   );
 }

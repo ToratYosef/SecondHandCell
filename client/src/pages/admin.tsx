@@ -6,31 +6,41 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Shield, LogIn } from "lucide-react";
+import { Shield, LogIn, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const ACCESS_CODE = "secondhand-secure";
+const ADMIN_EMAIL = "sales@secondhandcell.com";
+const ADMIN_PASSWORD = "12345";
 
 export default function AdminPage() {
   const [email, setEmail] = useState("");
-  const [passcode, setPasscode] = useState("");
+  const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
 
   const handleAuthenticate = () => {
-    if (!email || !passcode) {
+    if (!email || !password) {
       toast({
         title: "Missing information",
-        description: "Enter both an admin email and access code.",
+        description: "Enter both the admin email and password.",
         variant: "destructive",
       });
       return;
     }
 
-    if (passcode.trim() !== ACCESS_CODE) {
+    if (email.trim().toLowerCase() !== ADMIN_EMAIL) {
       toast({
         title: "Access denied",
-        description: "The access code does not match.",
+        description: "Use the operations email to unlock the dashboard.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.trim() !== ADMIN_PASSWORD) {
+      toast({
+        title: "Access denied",
+        description: "The password does not match our records.",
         variant: "destructive",
       });
       return;
@@ -44,13 +54,13 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background via-background to-secondary/10">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background via-background to-primary/10">
       <Navbar />
       <main className="flex-1 py-12 px-4">
         <div className="max-w-7xl mx-auto space-y-12">
           {!isAuthenticated ? (
             <div className="max-w-xl mx-auto">
-              <Card className="border-primary/40">
+              <Card className="border-primary/40 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-primary">
                     <Shield className="h-5 w-5" />
@@ -61,7 +71,7 @@ export default function AdminPage() {
                   <Alert className="bg-primary/10 border-primary/30">
                     <AlertTitle>Private workspace</AlertTitle>
                     <AlertDescription>
-                      Use the internal access code shared with the operations team. All actions inside the dashboard update customer workflows in real time.
+                      Use the credentials shared with the operations team. All actions inside the dashboard update customer workflows in real time and surface live support conversations.
                     </AlertDescription>
                   </Alert>
                   <div className="space-y-2">
@@ -69,22 +79,25 @@ export default function AdminPage() {
                     <Input
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
-                      placeholder="admin@secondhandcell.com"
+                      placeholder={ADMIN_EMAIL}
                       type="email"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Access code</label>
+                    <label className="text-sm font-medium">Password</label>
                     <Input
-                      value={passcode}
-                      onChange={(event) => setPasscode(event.target.value)}
-                      placeholder="Enter access code"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="Enter password"
                       type="password"
                     />
                   </div>
                   <Button className="w-full" size="lg" onClick={handleAuthenticate}>
                     <LogIn className="h-4 w-4 mr-2" /> Unlock dashboard
                   </Button>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Lock className="h-3 w-3" /> This portal centralizes analytics, workflow automation, and now live support with typing previews.
+                  </div>
                 </CardContent>
               </Card>
             </div>

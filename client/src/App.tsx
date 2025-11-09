@@ -12,6 +12,7 @@ import Contact from "@/pages/contact";
 import NotFound from "@/pages/not-found";
 import AdminPage from "@/pages/admin";
 import ThankYouPage from "@/pages/thank-you";
+import { LiveSupportWidget } from "@/components/live-support/live-support-widget";
 
 function Router() {
   return (
@@ -35,6 +36,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <LiveSupportWidget />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

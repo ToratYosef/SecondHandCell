@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Headset, BarChart3, RefreshCw } from "lucide-react";
 
 export default function Home() {
   return (
@@ -22,6 +22,47 @@ export default function Home() {
         <HowItWorksSection />
         <DeviceShowcase />
         <Testimonials />
+
+        <section className="py-16 bg-background">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-6 md:grid-cols-3">
+            <Card className="border-primary/30 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-primary">
+                  <Headset className="h-5 w-5" />
+                  <CardTitle className="text-lg">Live support, everywhere</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>Every page now includes a live support widget so customers can reach us instantly.</p>
+                <p>Admins see what customers type in real time and can trigger ShipEngine labels without switching tabs.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-primary/30 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-primary">
+                  <BarChart3 className="h-5 w-5" />
+                  <CardTitle className="text-lg">Analytics you can act on</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>Operations can monitor shipping kits, reminders, and payout pipelines from a single dashboard.</p>
+                <p>Support trends, conversation load, and priority queues update every few seconds.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-primary/30 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-primary">
+                  <RefreshCw className="h-5 w-5" />
+                  <CardTitle className="text-lg">Real-time workflow sync</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>Customer chats, quote updates, and trustpilot outreach sync instantly with order timelines.</p>
+                <p>Nothing slips through the cracks—from shipping kit reminders to review invitations.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
         <section className="py-12 bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-6 md:grid-cols-2">

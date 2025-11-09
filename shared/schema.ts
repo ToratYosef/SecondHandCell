@@ -23,11 +23,85 @@ export const deviceLockStatuses = ["locked", "unlocked"] as const;
 export const carriers = ["AT&T", "VZW", "TMO", "UNLOCKED"] as const;
 export const shippingMethods = ["email-label", "shipping-kit"] as const;
 
+export const supportSessionStatuses = ["open", "waiting", "closed"] as const;
+export const supportRoles = ["customer", "admin"] as const;
+export const supportPriorities = ["normal", "urgent"] as const;
+
 export type DeviceBrand = typeof deviceBrands[number];
 export type DeviceCondition = typeof deviceConditions[number];
 export type DeviceLockStatus = typeof deviceLockStatuses[number];
 export type Carrier = typeof carriers[number];
 export type ShippingMethod = typeof shippingMethods[number];
+export type SupportSessionStatus = typeof supportSessionStatuses[number];
+export type SupportRole = typeof supportRoles[number];
+export type SupportPriority = typeof supportPriorities[number];
+
+export interface SupportMessage {
+  id: string;
+  sessionId: string;
+  sender: SupportRole;
+  content: string;
+  createdAt: string;
+  read: boolean;
+  orderId?: string;
+}
+
+export interface SupportSession {
+  id: string;
+  customerEmail: string;
+  customerName?: string;
+  customerPhone?: string;
+  orderNumber?: string;
+  associatedQuoteIds: string[];
+  status: SupportSessionStatus;
+  priority: SupportPriority;
+  assignedTo?: string;
+  createdAt: string;
+  lastUpdatedAt: string;
+  lastMessageAt?: string;
+  lastMessagePreview?: string;
+  unreadForAdmin: number;
+  unreadForCustomer: number;
+  customerTypingPreview?: string;
+  adminTypingPreview?: string;
+}
+
+export const insertSupportSessionSchema = z.object({
+  customerEmail: z.string().email(),
+  customerName: z.string().min(1).optional(),
+  customerPhone: z.string().min(7).optional(),
+  orderNumber: z.string().min(1).optional(),
+  contextQuoteId: z.string().optional(),
+});
+
+export const supportMessageSchema = z.object({
+  sender: z.enum(supportRoles),
+  content: z.string().min(1),
+  orderId: z.string().optional(),
+});
+
+export const supportTypingSchema = z.object({
+  role: z.enum(supportRoles),
+  preview: z.string().max(500).optional(),
+});
+
+export const updateSupportSessionSchema = z.object({
+  status: z.enum(supportSessionStatuses).optional(),
+  priority: z.enum(supportPriorities).optional(),
+  assignedTo: z.string().optional(),
+  customerTypingPreview: z.string().optional(),
+  adminTypingPreview: z.string().optional(),
+});
+
+export const supportReadSchema = z.object({
+  role: z.enum(supportRoles),
+});
+
+export type InsertSupportSession = z.infer<typeof insertSupportSessionSchema>;
+export type InsertSupportMessage = z.infer<typeof supportMessageSchema>;
+export type SupportTypingUpdate = z.infer<typeof supportTypingSchema>;
+export type UpdateSupportSession = z.infer<typeof updateSupportSessionSchema>;
+export type SupportReadPayload = z.infer<typeof supportReadSchema>;
 
 export interface ShippingInfo {
   name: string;
@@ -192,3 +266,9 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
 
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+
+export interface SupportSessionDetail {
+  session: SupportSession;
+  messages: SupportMessage[];
+  orders: Quote[];
+}
