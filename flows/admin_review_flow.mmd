@@ -1,7 +1,0 @@
-flowchart TD
-  Admin[Admin] --> Dashboard[/Admin dashboard/]
-  Dashboard --> Query[GET /api/orders]
-  Query --> Store[(Firestore orders)]
-  Dashboard --> Update[POST /api/orders/:id/status]
-  Update --> Store
-  Update --> Audit[(adminAuditLogs)]
