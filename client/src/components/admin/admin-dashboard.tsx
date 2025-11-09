@@ -20,7 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Quote, QuoteWorkflow, WorkflowLabel, ReminderStatus } from "@shared/schema";
+import { Quote, QuoteWorkflow, WorkflowLabel, ReminderStatus, LabelActionKind, QuoteEmailTemplate } from "@shared/schema";
 import { SupportConsole } from "./support-console";
 import {
   MailCheck,
@@ -38,6 +38,13 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+
+const emailSuccessMessages: Record<QuoteEmailTemplate, string> = {
+  trustpilot: "Trustpilot invite sent to the customer.",
+  requote: "Requote email delivered for approval.",
+  reminder: "Reminder email sent to the customer.",
+  cancel: "Cancellation notice emailed to the customer.",
+};
 
 interface PatchPayload {
   id: string;
@@ -106,6 +113,10 @@ export function AdminDashboard() {
   const [photoUrl, setPhotoUrl] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
   const [requoteValue, setRequoteValue] = useState("");
+  const [labelSending, setLabelSending] = useState(false);
+  const [kitLoading, setKitLoading] = useState<"outbound" | "inbound" | null>(null);
+  const [returnSending, setReturnSending] = useState(false);
+  const [emailAction, setEmailAction] = useState<QuoteEmailTemplate | null>(null);
 
   const selectedQuote = useMemo(() => {
     if (!quotes || quotes.length === 0) return null;
@@ -148,6 +159,66 @@ export function AdminDashboard() {
     },
   });
 
+  const syncFromQuote = (quote: Quote) => {
+    setSelectedQuoteId(quote.id);
+    setAdminNotes(quote.workflow.adminNotes ?? "");
+    setOutboundLabel(quote.workflow.kitLabels?.outbound ?? {});
+    setInboundLabel(quote.workflow.kitLabels?.inbound ?? {});
+    setReturnLabel(quote.workflow.returnLabel ?? {});
+    setRequoteValue(quote.price.toString());
+  };
+
+  const executeLabelAction = async (
+    kind: LabelActionKind,
+    options: { notes?: string; sendEmail?: boolean } = {}
+  ) => {
+    if (!selectedQuote) return undefined;
+    const res = await apiRequest("POST", `/api/quotes/${selectedQuote.id}/labels`, {
+      kind,
+      notes: options.notes,
+      sendEmail: options.sendEmail,
+      adminNotes,
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error?.error ?? "Unable to create label");
+    }
+    const data = await res.json();
+    const updated = data.quote as Quote;
+    syncFromQuote(updated);
+    return updated;
+  };
+
+  const sendQuoteEmail = async (template: QuoteEmailTemplate, data: Record<string, unknown> = {}) => {
+    if (!selectedQuote) return;
+    setEmailAction(template);
+    try {
+      const res = await apiRequest("POST", `/api/quotes/${selectedQuote.id}/emails`, {
+        template,
+        adminNotes,
+        ...data,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error?.error ?? "Unable to send email");
+      }
+      toast({
+        title: "Email sent",
+        description: emailSuccessMessages[template],
+      });
+      return await res.json();
+    } catch (error: any) {
+      toast({
+        title: "Email failed",
+        description: error.message ?? "Unable to send email",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setEmailAction(null);
+    }
+  };
+
   const appendStatus = (status: string, note?: string) => {
     if (!selectedQuote) return undefined;
     return [
@@ -160,7 +231,7 @@ export function AdminDashboard() {
     ];
   };
 
-  const runUpdate = (options: {
+  const runUpdate = async (options: {
     status?: string;
     workflowUpdates?: Partial<QuoteWorkflow>;
     successMessage?: string;
@@ -168,7 +239,7 @@ export function AdminDashboard() {
     price?: number;
     note?: string;
   }) => {
-    if (!selectedQuote) return;
+    if (!selectedQuote) return undefined;
     const { status, workflowUpdates = {}, successMessage, reviewEmailSent, price, note } = options;
 
     const mergedWorkflow = buildWorkflow(selectedQuote.workflow, {
@@ -190,157 +261,260 @@ export function AdminDashboard() {
       payload.price = price;
     }
 
-    mutation.mutate({ id: selectedQuote.id, payload, successMessage });
+    const result = await mutation.mutateAsync({ id: selectedQuote.id, payload, successMessage });
+    syncFromQuote(result.quote);
+    return result.quote;
   };
 
-  const handleSendLabelEmail = () => {
+  const handleSendLabelEmail = async () => {
     if (!selectedQuote) return;
-    runUpdate({
-      status: "label_sent",
-      workflowUpdates: {
-        adminNotes,
-        kitLabels: selectedQuote.workflow.kitLabels,
-      },
-      successMessage: "Label email recorded",
-      note: labelNotes || "Label emailed to customer",
-    });
-    setLabelNotes("");
+    setLabelSending(true);
+    try {
+      await executeLabelAction("email_label", {
+        notes: labelNotes || undefined,
+        sendEmail: true,
+      });
+      toast({
+        title: "Label emailed",
+        description: "Customer received their prepaid label.",
+      });
+      setLabelNotes("");
+      void refetch();
+    } catch (error: any) {
+      toast({
+        title: "Label email failed",
+        description: error.message ?? "Unable to send label",
+        variant: "destructive",
+      });
+    } finally {
+      setLabelSending(false);
+    }
   };
 
-  const handleShippingKitUpdate = (direction: "outbound" | "inbound") => {
+  const handleShippingKitUpdate = async (direction: "outbound" | "inbound") => {
     if (!selectedQuote) return;
-    const kitLabels = {
-      outbound: direction === "outbound" ? outboundLabel : selectedQuote.workflow.kitLabels?.outbound,
-      inbound: direction === "inbound" ? inboundLabel : selectedQuote.workflow.kitLabels?.inbound,
-    };
-    runUpdate({
-      status: "kit_prepared",
-      workflowUpdates: {
-        kitLabels,
-        adminNotes,
-      },
-      successMessage: "Shipping kit labels saved",
-      note: direction === "outbound" ? "Outbound kit label saved" : "Inbound kit label saved",
-    });
+    setKitLoading(direction);
+    try {
+      await executeLabelAction(direction === "outbound" ? "kit_outbound" : "kit_inbound", {
+        notes: direction === "inbound" ? labelNotes || undefined : undefined,
+        sendEmail: direction === "inbound",
+      });
+      toast({
+        title: direction === "outbound" ? "Outbound label ready" : "Inbound label sent",
+        description:
+          direction === "inbound"
+            ? "Customer received the kit instructions."
+            : "Download and print the kit label for shipping.",
+      });
+      if (direction === "inbound") {
+        setLabelNotes("");
+      }
+      void refetch();
+    } catch (error: any) {
+      toast({
+        title: "Label generation failed",
+        description: error.message ?? "Unable to generate label",
+        variant: "destructive",
+      });
+    } finally {
+      setKitLoading(null);
+    }
   };
 
-  const handleMarkReceived = () => {
-    runUpdate({
-      status: "device_received",
-      workflowUpdates: { adminNotes },
-      successMessage: "Device marked as received",
-      note: "Device checked in",
-    });
+  const handleMarkReceived = async () => {
+    try {
+      await runUpdate({
+        status: "device_received",
+        workflowUpdates: { adminNotes },
+        successMessage: "Device marked as received",
+        note: "Device checked in",
+      });
+    } catch {
+      // mutation error already surfaced via toast
+    }
   };
 
-  const handleApprovePayment = () => {
+  const handleApprovePayment = async () => {
     if (!selectedQuote) return;
-    runUpdate({
-      status: "paid",
-      workflowUpdates: {
-        paymentReleasedAt: new Date().toISOString(),
-        adminNotes,
-      },
-      successMessage: "Payment recorded",
-      note: "Customer paid",
-    });
+    try {
+      await runUpdate({
+        status: "paid",
+        workflowUpdates: {
+          paymentReleasedAt: new Date().toISOString(),
+          adminNotes,
+        },
+        successMessage: "Payment recorded",
+        note: "Customer paid",
+      });
+    } catch {
+      // toast already handled
+    }
   };
 
-  const handleSendTrustpilot = () => {
-    runUpdate({
-      workflowUpdates: {
-        reviewEmailSentAt: new Date().toISOString(),
-        adminNotes,
-      },
-      reviewEmailSent: true,
-      successMessage: "Trustpilot invite noted",
-      note: "Trustpilot invite sent",
-    });
+  const handleSendTrustpilot = async () => {
+    try {
+      const updated = await runUpdate({
+        workflowUpdates: {
+          reviewEmailSentAt: new Date().toISOString(),
+          adminNotes,
+        },
+        reviewEmailSent: true,
+        successMessage: "Trustpilot invite noted",
+        note: "Trustpilot invite sent",
+      });
+      if (updated) {
+        try {
+          await sendQuoteEmail("trustpilot");
+        } catch {
+          // toast handled in sendQuoteEmail
+        }
+      }
+    } catch {
+      // mutation toast already displayed
+    }
   };
 
-  const handleRequote = () => {
+  const handleRequote = async () => {
     if (!selectedQuote) return;
     const nextPrice = Number.parseFloat(requoteValue);
     const payout = Number.isNaN(nextPrice) ? selectedQuote.price : nextPrice;
-    runUpdate({
-      status: "requote_sent",
-      workflowUpdates: {
-        payoutAmount: payout,
-        totalDue: selectedQuote.workflow.shippingMethod === "shipping-kit" ? Math.max(payout - selectedQuote.workflow.shippingKitFee, 0) : payout,
-        trustpilotEligible: false,
-        adminNotes,
-      },
-      price: payout,
-      successMessage: "Requote sent to customer",
-      note: "Requote emailed",
-    });
+    try {
+      const updated = await runUpdate({
+        status: "requote_sent",
+        workflowUpdates: {
+          payoutAmount: payout,
+          totalDue:
+            selectedQuote.workflow.shippingMethod === "shipping-kit"
+              ? Math.max(payout - selectedQuote.workflow.shippingKitFee, 0)
+              : payout,
+          trustpilotEligible: false,
+          adminNotes,
+        },
+        price: payout,
+        successMessage: "Requote sent to customer",
+        note: "Requote emailed",
+      });
+      if (updated) {
+        try {
+          await sendQuoteEmail("requote", { requoteAmount: payout });
+        } catch {
+          // handled above
+        }
+      }
+    } catch {
+      // mutation toast already displayed
+    }
   };
 
-  const handleRequoteAccepted = () => {
+  const handleRequoteAccepted = async () => {
     if (!selectedQuote) return;
     const payout = Number.parseFloat(requoteValue);
     const next = Number.isNaN(payout) ? selectedQuote.price : payout;
-    runUpdate({
-      status: "ready_for_payment",
-      workflowUpdates: {
-        payoutAmount: next,
-        totalDue: selectedQuote.workflow.shippingMethod === "shipping-kit" ? Math.max(next - selectedQuote.workflow.shippingKitFee, 0) : next,
-        trustpilotEligible: true,
-        adminNotes,
-      },
-      price: next,
-      successMessage: "Requote accepted",
-      note: "Customer approved requote",
-    });
-  };
-
-  const handleReturnLabel = () => {
-    runUpdate({
-      status: "return_initiated",
-      workflowUpdates: {
-        returnLabel,
-        adminNotes,
-        trustpilotEligible: false,
-      },
-      successMessage: "Return label stored",
-      reviewEmailSent: false,
-      note: "Return label sent",
-    });
-  };
-
-  const handleReminder = (type: ReminderStatus) => {
-    runUpdate({
-      workflowUpdates: {
-        reminders: {
-          status: type,
-          lastSentAt: new Date().toISOString(),
+    try {
+      await runUpdate({
+        status: "ready_for_payment",
+        workflowUpdates: {
+          payoutAmount: next,
+          totalDue:
+            selectedQuote.workflow.shippingMethod === "shipping-kit"
+              ? Math.max(next - selectedQuote.workflow.shippingKitFee, 0)
+              : next,
+          trustpilotEligible: true,
+          adminNotes,
         },
-        adminNotes,
-      },
-      successMessage: type === "seven_day" ? "7-day reminder logged" : type === "fifteen_day" ? "15-day warning recorded" : "Reminder status updated",
-      note: type === "seven_day" ? "7-day reminder" : type === "fifteen_day" ? "15-day warning" : undefined,
-    });
+        price: next,
+        successMessage: "Requote accepted",
+        note: "Customer approved requote",
+      });
+    } catch {
+      // toast already displayed
+    }
   };
 
-  const handleCancelAfterReminder = () => {
-    runUpdate({
-      status: "canceled",
-      workflowUpdates: {
-        reminders: {
-          status: "canceled",
-          lastSentAt: new Date().toISOString(),
+  const handleReturnLabel = async () => {
+    if (!selectedQuote) return;
+    setReturnSending(true);
+    try {
+      await executeLabelAction("return_label", {
+        notes: returnLabel.notes || undefined,
+        sendEmail: true,
+      });
+      toast({
+        title: "Return started",
+        description: "Return tracking emailed to the customer.",
+      });
+      void refetch();
+    } catch (error: any) {
+      toast({
+        title: "Return label failed",
+        description: error.message ?? "Unable to create return label",
+        variant: "destructive",
+      });
+    } finally {
+      setReturnSending(false);
+    }
+  };
+
+  const handleReminder = async (type: ReminderStatus) => {
+    try {
+      const updated = await runUpdate({
+        workflowUpdates: {
+          reminders: {
+            status: type,
+            lastSentAt: new Date().toISOString(),
+          },
+          adminNotes,
         },
-        adminNotes,
-      },
-      successMessage: "Order canceled after reminder",
-      note: "Order canceled after reminder",
-    });
+        successMessage:
+          type === "seven_day"
+            ? "7-day reminder logged"
+            : type === "fifteen_day"
+              ? "15-day warning recorded"
+              : "Reminder status updated",
+        note: type === "seven_day" ? "7-day reminder" : type === "fifteen_day" ? "15-day warning" : undefined,
+      });
+      if (updated && (type === "seven_day" || type === "fifteen_day")) {
+        try {
+          await sendQuoteEmail("reminder", { reminderType: type });
+        } catch {
+          // handled in sendQuoteEmail
+        }
+      }
+    } catch {
+      // mutation toast already surfaced
+    }
+  };
+
+  const handleCancelAfterReminder = async () => {
+    try {
+      const updated = await runUpdate({
+        status: "canceled",
+        workflowUpdates: {
+          reminders: {
+            status: "canceled",
+            lastSentAt: new Date().toISOString(),
+          },
+          adminNotes,
+        },
+        successMessage: "Order canceled after reminder",
+        note: "Order canceled after reminder",
+      });
+      if (updated) {
+        try {
+          await sendQuoteEmail("cancel");
+        } catch {
+          // toast already shown
+        }
+      }
+    } catch {
+      // mutation toast already displayed
+    }
   };
 
   const handleAddPhoto = () => {
     if (!selectedQuote || !photoUrl) return;
     const currentPhotos = selectedQuote.workflow.devicePhotos ?? [];
-    runUpdate({
+    void runUpdate({
       workflowUpdates: {
         devicePhotos: [...currentPhotos, photoUrl],
         adminNotes,
@@ -632,35 +806,101 @@ export function AdminDashboard() {
                 <div className="space-y-3">
                   <h3 className="font-semibold text-primary flex items-center gap-2"><Ship className="h-4 w-4" /> Label management</h3>
                   <Textarea
-                    placeholder="Notes about the shipping label email"
+                    placeholder={
+                      selectedQuote.workflow.shippingMethod === "shipping-kit"
+                        ? "Optional note to include in the inbound kit email"
+                        : "Notes to include in the shipping label email"
+                    }
                     value={labelNotes}
                     onChange={(event) => setLabelNotes(event.target.value)}
                   />
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={handleSendLabelEmail} disabled={mutation.isPending}>
-                      <MailCheck className="h-4 w-4 mr-2" /> Record emailed label
-                    </Button>
-                    {selectedQuote.workflow.shippingMethod === "shipping-kit" && (
-                      <Button variant="outline" onClick={() => handleShippingKitUpdate("outbound")} disabled={mutation.isPending}>
-                        <UploadCloud className="h-4 w-4 mr-2" /> Save outbound kit label
+                    {selectedQuote.workflow.shippingMethod === "email-label" && (
+                      <Button variant="outline" onClick={handleSendLabelEmail} disabled={labelSending || mutation.isPending}>
+                        <MailCheck className="h-4 w-4 mr-2" /> Generate &amp; email label
                       </Button>
                     )}
                     {selectedQuote.workflow.shippingMethod === "shipping-kit" && (
-                      <Button variant="outline" onClick={() => handleShippingKitUpdate("inbound")} disabled={mutation.isPending}>
-                        <UploadCloud className="h-4 w-4 mr-2" /> Save inbound kit label
+                      <Button
+                        variant="outline"
+                        onClick={() => handleShippingKitUpdate("outbound")}
+                        disabled={kitLoading === "outbound" || mutation.isPending}
+                      >
+                        <UploadCloud className="h-4 w-4 mr-2" /> Generate outbound kit label
+                      </Button>
+                    )}
+                    {selectedQuote.workflow.shippingMethod === "shipping-kit" && (
+                      <Button
+                        variant="outline"
+                        onClick={() => handleShippingKitUpdate("inbound")}
+                        disabled={kitLoading === "inbound" || mutation.isPending}
+                      >
+                        <UploadCloud className="h-4 w-4 mr-2" /> Generate &amp; email inbound label
                       </Button>
                     )}
                   </div>
                   {selectedQuote.workflow.shippingMethod === "shipping-kit" && (
                     <div className="grid md:grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <LabelledInput label="Outbound tracking" value={outboundLabel.trackingNumber ?? ""} onChange={(value) => setOutboundLabel((prev) => ({ ...prev, trackingNumber: value }))} />
-                        <LabelledInput label="Outbound label URL" value={outboundLabel.url ?? ""} onChange={(value) => setOutboundLabel((prev) => ({ ...prev, url: value }))} />
+                        <LabelledInput
+                          label="Outbound tracking"
+                          value={outboundLabel.trackingNumber ?? ""}
+                          readOnly
+                          description={outboundLabel.trackingNumber ? "Share with the customer if they need an ETA." : undefined}
+                        />
+                        <LabelledInput
+                          label="Outbound label URL"
+                          value={outboundLabel.url ?? ""}
+                          readOnly
+                          description={outboundLabel.url ? "Open to print the kit you send to the customer." : undefined}
+                        />
+                      {outboundLabel.url && (
+                        <Button variant="ghost" asChild className="px-0 text-primary">
+                          <a href={outboundLabel.url} target="_blank" rel="noreferrer">
+                            Open outbound label
+                          </a>
+                        </Button>
+                      )}
                       </div>
                       <div className="space-y-2">
-                        <LabelledInput label="Inbound tracking" value={inboundLabel.trackingNumber ?? ""} onChange={(value) => setInboundLabel((prev) => ({ ...prev, trackingNumber: value }))} />
-                        <LabelledInput label="Inbound label URL" value={inboundLabel.url ?? ""} onChange={(value) => setInboundLabel((prev) => ({ ...prev, url: value }))} />
+                        <LabelledInput
+                          label="Inbound tracking"
+                          value={inboundLabel.trackingNumber ?? ""}
+                          readOnly
+                          description={inboundLabel.trackingNumber ? "Monitor the return from the customer." : undefined}
+                        />
+                        <LabelledInput
+                          label="Inbound label URL"
+                          value={inboundLabel.url ?? ""}
+                          readOnly
+                          description={inboundLabel.url ? "Link included in the customer email." : undefined}
+                        />
+                        {inboundLabel.url && (
+                          <Button variant="ghost" asChild className="px-0 text-primary">
+                            <a href={inboundLabel.url} target="_blank" rel="noreferrer">
+                              Open inbound label
+                            </a>
+                          </Button>
+                        )}
                       </div>
+                    </div>
+                  )}
+                  {selectedQuote.workflow.shippingMethod === "email-label" && (inboundLabel.trackingNumber || inboundLabel.url) && (
+                    <div className="space-y-2">
+                      <LabelledInput
+                        label="Label tracking"
+                        value={inboundLabel.trackingNumber ?? ""}
+                        readOnly
+                        description="Used by the customer when they drop off the package."
+                      />
+                      <LabelledInput label="Label URL" value={inboundLabel.url ?? ""} readOnly />
+                      {inboundLabel.url && (
+                        <Button variant="ghost" asChild className="px-0 text-primary">
+                          <a href={inboundLabel.url} target="_blank" rel="noreferrer">
+                            Open shipping label
+                          </a>
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -679,24 +919,37 @@ export function AdminDashboard() {
                       onClick={handleSendTrustpilot}
                       disabled={
                         mutation.isPending ||
+                        emailAction === "trustpilot" ||
                         selectedQuote.reviewEmailSent ||
                         !selectedQuote.workflow.trustpilotEligible
                       }
                     >
                       <MailCheck className="h-4 w-4 mr-2" /> Send Trustpilot invite
                     </Button>
-                    <Button variant="outline" onClick={handleReturnLabel} disabled={mutation.isPending}>
+                    <Button variant="outline" onClick={handleReturnLabel} disabled={returnSending || mutation.isPending}>
                       <Undo2 className="h-4 w-4 mr-2" /> Start return
                     </Button>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-2">
-                    <Button variant="outline" onClick={() => handleReminder("seven_day")} disabled={mutation.isPending}>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleReminder("seven_day")}
+                      disabled={mutation.isPending || emailAction === "reminder"}
+                    >
                       <Clock className="h-4 w-4 mr-2" /> Log 7-day reminder
                     </Button>
-                    <Button variant="outline" onClick={() => handleReminder("fifteen_day")} disabled={mutation.isPending}>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleReminder("fifteen_day")}
+                      disabled={mutation.isPending || emailAction === "reminder"}
+                    >
                       <Clock className="h-4 w-4 mr-2" /> Log 15-day warning
                     </Button>
-                    <Button variant="outline" onClick={handleCancelAfterReminder} disabled={mutation.isPending}>
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelAfterReminder}
+                      disabled={mutation.isPending || emailAction === "cancel"}
+                    >
                       <AlertTriangle className="h-4 w-4 mr-2" /> Cancel after reminder
                     </Button>
                     <Button variant="outline" onClick={handleRequoteAccepted} disabled={mutation.isPending}>
@@ -711,7 +964,11 @@ export function AdminDashboard() {
                       type="number"
                     />
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={handleRequote} disabled={mutation.isPending}>
+                      <Button
+                        variant="outline"
+                        onClick={handleRequote}
+                        disabled={mutation.isPending || emailAction === "requote"}
+                      >
                         <RefreshCcw className="h-4 w-4 mr-2" /> Send requote
                       </Button>
                       <Button variant="outline" onClick={() => handleReminder("not_sent")} disabled={mutation.isPending}>
@@ -723,12 +980,26 @@ export function AdminDashboard() {
                     <LabelledInput
                       label="Return tracking"
                       value={returnLabel.trackingNumber ?? ""}
-                      onChange={(value) => setReturnLabel((prev) => ({ ...prev, trackingNumber: value }))}
+                      readOnly
+                      description={returnLabel.trackingNumber ? "Share with the customer for their reference." : undefined}
                     />
                     <LabelledInput
                       label="Return label URL"
                       value={returnLabel.url ?? ""}
-                      onChange={(value) => setReturnLabel((prev) => ({ ...prev, url: value }))}
+                      readOnly
+                    />
+                    {returnLabel.url && (
+                      <Button variant="ghost" asChild className="px-0 text-primary">
+                        <a href={returnLabel.url} target="_blank" rel="noreferrer">
+                          Open return label
+                        </a>
+                      </Button>
+                    )}
+                    <LabelledInput
+                      label="Return email note"
+                      value={returnLabel.notes ?? ""}
+                      onChange={(value) => setReturnLabel((prev) => ({ ...prev, notes: value }))}
+                      placeholder="Optional message to include in the email"
                     />
                   </div>
                 </div>
@@ -812,16 +1083,30 @@ function LabelledInput({
   value,
   onChange,
   type = "text",
+  readOnly = false,
+  placeholder,
+  description,
 }: {
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
   type?: string;
+  readOnly?: boolean;
+  placeholder?: string;
+  description?: string;
 }) {
   return (
     <div className="space-y-1">
       <label className="text-xs text-muted-foreground block">{label}</label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} type={type} />
+      <Input
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
+        type={type}
+        readOnly={readOnly}
+        placeholder={placeholder}
+        className={readOnly ? "bg-muted/60 cursor-text" : undefined}
+      />
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
     </div>
   );
 }

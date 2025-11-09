@@ -19,6 +19,8 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
+type QuoteUpdate = Partial<Omit<Quote, "workflow">> & { workflow?: Partial<QuoteWorkflow> };
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -29,7 +31,7 @@ export interface IStorage {
   getAllQuotes(): Promise<Quote[]>;
   getQuotesByEmail(email: string): Promise<Quote[]>;
   updateQuoteStatus(id: string, status: string): Promise<Quote | undefined>;
-  updateQuote(id: string, update: Partial<Quote>): Promise<Quote | undefined>;
+  updateQuote(id: string, update: QuoteUpdate): Promise<Quote | undefined>;
 
   createContact(contact: InsertContact): Promise<Contact>;
   getAllContacts(): Promise<Contact[]>;
@@ -219,7 +221,7 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async updateQuote(id: string, update: Partial<Quote>): Promise<Quote | undefined> {
+  async updateQuote(id: string, update: QuoteUpdate): Promise<Quote | undefined> {
     const quote = this.quotes.get(id);
     if (!quote) return undefined;
 

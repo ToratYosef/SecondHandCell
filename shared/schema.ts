@@ -199,6 +199,43 @@ export const quoteWorkflowSchema = z.object({
   devicePhotos: z.array(z.string().url()).optional(),
 });
 
+export const labelActionKinds = [
+  "email_label",
+  "kit_outbound",
+  "kit_inbound",
+  "return_label",
+] as const;
+
+export type LabelActionKind = typeof labelActionKinds[number];
+
+export const labelActionSchema = z.object({
+  kind: z.enum(labelActionKinds),
+  notes: z.string().optional(),
+  adminNotes: z.string().optional(),
+  sendEmail: z.boolean().optional(),
+});
+
+export type LabelActionPayload = z.infer<typeof labelActionSchema>;
+
+export const quoteEmailTemplates = [
+  "trustpilot",
+  "requote",
+  "reminder",
+  "cancel",
+] as const;
+
+export type QuoteEmailTemplate = typeof quoteEmailTemplates[number];
+
+export const quoteEmailSchema = z.object({
+  template: z.enum(quoteEmailTemplates),
+  notes: z.string().optional(),
+  adminNotes: z.string().optional(),
+  requoteAmount: z.number().nonnegative().optional(),
+  reminderType: z.enum(["seven_day", "fifteen_day"]).optional(),
+});
+
+export type QuoteEmailPayload = z.infer<typeof quoteEmailSchema>;
+
 export interface DeviceModel {
   id: string;
   brand: DeviceBrand;
