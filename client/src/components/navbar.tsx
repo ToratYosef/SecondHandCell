@@ -46,6 +46,11 @@ export function Navbar() {
                 Contact
               </Button>
             </Link>
+            <Link href="/admin" data-testid="link-nav-admin">
+              <Button variant={location === "/admin" ? "secondary" : "ghost"}>
+                Admin
+              </Button>
+            </Link>
           </div>
 
           <div className="flex items-center gap-2">
