@@ -1,0 +1,7 @@
+flowchart TD
+  U[Customer] --> Sell[/Sell quote page/]
+  Sell --> Form{Submit quote}
+  Form --> API[POST /api/submit-order]
+  API --> Store[(Firestore orders)]
+  API --> Mirror[(users/{uid}/orders)]
+  API --> Notify[[Email + Push]]

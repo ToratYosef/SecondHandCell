@@ -1,0 +1,7 @@
+flowchart TD
+  Stripe[[Stripe]] --> Webhook[/Webhook endpoint/]
+  Webhook --> Verify{Verify signature}
+  Verify --> Update[(Firestore wholesaleOrders)]
+  ShipEngine[[ShipEngine]] --> Webhook2[/Tracking webhook/]
+  Webhook2 --> Sync[Update tracking]
+  Sync --> Orders[(Firestore orders)]
