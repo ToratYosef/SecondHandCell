@@ -1,0 +1,30 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="second-hand-cell-logo-title second-hand-cell-logo-desc">
+  <title id="second-hand-cell-logo-title">SecondHandCell logo</title>
+  <desc id="second-hand-cell-logo-desc">A smartphone surrounded by a green and blue circular arrow with cash in the center.</desc>
+  <defs>
+    <linearGradient id="ringGradient" x1="32" y1="224" x2="224" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F6AB4" />
+      <stop offset="0.5" stop-color="#34A853" />
+      <stop offset="1" stop-color="#8AC641" />
+    </linearGradient>
+    <linearGradient id="phoneGradient" x1="96" y1="220" x2="160" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B4F94" />
+      <stop offset="1" stop-color="#1F8EED" />
+    </linearGradient>
+    <linearGradient id="cashGradient" x1="140" y1="132" x2="180" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7BC143" />
+      <stop offset="1" stop-color="#B7E161" />
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.08" />
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M128 20c59.55 0 108 48.45 108 108 0 23.14-7.35 45.15-20.56 63.42l17.55 17.55c3.12 3.12 0.91 8.46-3.49 8.46H181.1c-3.03 0-5.48-2.45-5.48-5.48V103.84c0-4.39 5.34-6.61 8.46-3.49l16.44 16.44C209.21 99.88 211.5 91.19 211.5 80 211.5 46.1 183.9 18.5 150 18.5S88.5 46.1 88.5 80v12.5H60.94C49.04 92.5 39.5 82.96 39.5 71.06V60.94C39.5 27.04 67.04-0.5 100.94-0.5H128z" fill="url(#ringGradient)" />
+    <rect x="88" y="32" width="80" height="192" rx="18" fill="white" stroke="url(#phoneGradient)" stroke-width="10" />
+    <rect x="108" y="56" width="40" height="6" rx="3" fill="#0F6AB4" opacity="0.5" />
+    <circle cx="128" cy="210" r="7" fill="#0F6AB4" />
+    <path d="M90 142l56-24c4.97-2.13 10.64 0.22 12.77 5.2l8.03 18.7c2.13 4.97-0.22 10.64-5.2 12.77L106 181.4c-4.97 2.13-10.64-0.22-12.77-5.2L85.2 157c-2.13-4.97 0.22-10.64 5.2-12.77z" fill="url(#cashGradient)" />
+    <path d="M140 138c4.42 0 8 3.58 8 8 0 3.79-2.66 6.96-6.22 7.79l1.22 6.21h-6l-1-5.11a8.003 8.003 0 01-7-7.89v-.02a8 8 0 018-7.98z" fill="#1E7040" opacity="0.8" />
+  </g>
+</svg>

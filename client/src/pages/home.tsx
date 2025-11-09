@@ -5,10 +5,12 @@ import { HowItWorksSection } from "@/components/how-it-works-section";
 import { DeviceShowcase } from "@/components/device-showcase";
 import { Testimonials } from "@/components/testimonials";
 import { Footer } from "@/components/footer";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Headset, BarChart3, RefreshCw } from "lucide-react";
 
 export default function Home() {
   return (
@@ -20,7 +22,90 @@ export default function Home() {
         <HowItWorksSection />
         <DeviceShowcase />
         <Testimonials />
-        
+
+        <section className="py-16 bg-background">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-6 md:grid-cols-3">
+            <Card className="border-primary/30 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-primary">
+                  <Headset className="h-5 w-5" />
+                  <CardTitle className="text-lg">Live support, everywhere</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>Every page now includes a live support widget so customers can reach us instantly.</p>
+                <p>Admins see what customers type in real time and can trigger ShipEngine labels without switching tabs.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-primary/30 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-primary">
+                  <BarChart3 className="h-5 w-5" />
+                  <CardTitle className="text-lg">Analytics you can act on</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>Operations can monitor shipping kits, reminders, and payout pipelines from a single dashboard.</p>
+                <p>Support trends, conversation load, and priority queues update every few seconds.</p>
+              </CardContent>
+            </Card>
+            <Card className="border-primary/30 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-primary">
+                  <RefreshCw className="h-5 w-5" />
+                  <CardTitle className="text-lg">Real-time workflow sync</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>Customer chats, quote updates, and trustpilot outreach sync instantly with order timelines.</p>
+                <p>Nothing slips through the cracks—from shipping kit reminders to review invitations.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="py-12 bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-6 md:grid-cols-2">
+            <Card className="border-primary/30">
+              <CardHeader>
+                <CardTitle>Shipping options built for speed</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>Choose a free email label or upgrade to our $10 shipping kit. Kits include:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Outbound label straight to your door</li>
+                  <li>Inbound label returning the device to us</li>
+                  <li>Printable 4x2 order card with GB, condition, and lock status</li>
+                </ul>
+                <Alert className="bg-secondary/10 border-secondary/40">
+                  <AlertTitle>Automated follow-ups</AlertTitle>
+                  <AlertDescription>
+                    A reminder email is triggered 7 days after your kit arrives. If the device still hasn’t shipped after 15 days we’ll cancel the order and retire the labels.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+
+            <Card className="border-secondary/40">
+              <CardHeader>
+                <CardTitle>Carrier &amp; device eligibility</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>We proudly support:</p>
+                <div className="flex flex-wrap gap-2">
+                  {(["AT&T", "VZW", "TMO", "UNLOCKED"] as const).map((carrier) => (
+                    <Badge key={carrier} className="bg-primary/10 text-primary text-sm px-3 py-1">
+                      {carrier}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-primary font-semibold">We do not accept blacklisted or finance-locked devices.</p>
+                <p>Photos and updated pricing tables can be uploaded by our admins directly within the secure dashboard.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
         <section className="py-16 md:py-24 bg-primary/5">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <Card className="border-primary/20">

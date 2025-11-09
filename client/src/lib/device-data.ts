@@ -1,4 +1,4 @@
-import { DeviceModel, DeviceCondition } from "@shared/schema";
+import { DeviceModel, DeviceCondition, Carrier, DeviceLockStatus } from "@shared/schema";
 
 export const deviceModels: DeviceModel[] = [
   { id: "iphone-15-pro-max", brand: "iPhone", name: "iPhone 15 Pro Max", storageOptions: [256, 512, 1000], basePrice: 1100, year: 2024 },
@@ -29,30 +29,77 @@ export const deviceModels: DeviceModel[] = [
 ];
 
 export const conditionMultipliers: Record<DeviceCondition, number> = {
-  "Excellent": 1.0,
+  "Excellent": 1,
   "Good": 0.85,
   "Fair": 0.65,
 };
 
 export const storageMultipliers: Record<number, number> = {
   64: 0.85,
-  128: 1.0,
-  256: 1.15,
-  512: 1.35,
-  1000: 1.6,
+  128: 1,
+  256: 1.18,
+  512: 1.38,
+  1000: 1.62,
+};
+
+const lockMultipliers: Record<DeviceLockStatus, number> = {
+  unlocked: 1,
+  locked: 0.92,
+};
+
+export type DevicePricingMatrix = Record<
+  number,
+  Record<DeviceLockStatus, Record<DeviceCondition, number>>
+>;
+
+export const devicePricingDb: Record<string, DevicePricingMatrix> = Object.fromEntries(
+  deviceModels.map((model) => {
+    const matrix: DevicePricingMatrix = {};
+
+    model.storageOptions.forEach((storage) => {
+      const storageBase = model.basePrice * (storageMultipliers[storage] ?? 1);
+
+      const lockEntries: Record<DeviceLockStatus, Record<DeviceCondition, number>> = {
+        unlocked: {
+          Excellent: Math.round(storageBase * conditionMultipliers.Excellent),
+          Good: Math.round(storageBase * conditionMultipliers.Good),
+          Fair: Math.round(storageBase * conditionMultipliers.Fair),
+        },
+        locked: {
+          Excellent: Math.round(storageBase * lockMultipliers.locked * conditionMultipliers.Excellent),
+          Good: Math.round(storageBase * lockMultipliers.locked * conditionMultipliers.Good),
+          Fair: Math.round(storageBase * lockMultipliers.locked * conditionMultipliers.Fair),
+        },
+      };
+
+      matrix[storage] = lockEntries;
+    });
+
+    return [model.id, matrix];
+  }),
+);
+
+export const carrierLockStatus: Record<Carrier, DeviceLockStatus> = {
+  "AT&T": "locked",
+  "VZW": "locked",
+  "TMO": "locked",
+  "UNLOCKED": "unlocked",
 };
 
 export function calculatePrice(
   modelId: string,
   storage: number,
-  condition: DeviceCondition
+  condition: DeviceCondition,
+  carrier: Carrier
 ): number {
-  const model = deviceModels.find(m => m.id === modelId);
-  if (!model) return 0;
+  const pricing = devicePricingDb[modelId];
+  if (!pricing) return 0;
 
-  const basePrice = model.basePrice;
-  const conditionMultiplier = conditionMultipliers[condition];
-  const storageMultiplier = storageMultipliers[storage] || 1.0;
+  const storagePricing = pricing[storage];
+  if (!storagePricing) return 0;
 
-  return Math.round(basePrice * conditionMultiplier * storageMultiplier);
+  const lockStatus = carrierLockStatus[carrier];
+  const conditionPricing = storagePricing[lockStatus];
+
+  return conditionPricing?.[condition] ?? 0;
 }

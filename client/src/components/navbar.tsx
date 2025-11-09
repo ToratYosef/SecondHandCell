@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
-import { Smartphone } from "lucide-react";
+import Logo from "@/assets/logo.svg";
 
 export function Navbar() {
   const [location] = useLocation();
@@ -11,9 +11,12 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           <Link href="/" data-testid="link-home">
-            <div className="flex items-center gap-2 hover-elevate active-elevate-2 px-3 py-2 rounded-md cursor-pointer">
-              <Smartphone className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">SecondhandCell</span>
+            <div className="flex items-center gap-3 hover-elevate active-elevate-2 px-3 py-2 rounded-md cursor-pointer">
+              <img src={Logo} alt="SecondHandCell logo" className="h-9 w-9" />
+              <div className="flex flex-col leading-tight">
+                <span className="text-xl font-extrabold text-primary">Second</span>
+                <span className="text-xl font-extrabold text-secondary -mt-2">HandCell</span>
+              </div>
             </div>
           </Link>
 
