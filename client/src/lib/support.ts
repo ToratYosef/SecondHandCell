@@ -23,8 +23,20 @@ export async function fetchSupportSessions(): Promise<SupportSession[]> {
 
 export async function fetchSupportSession(
   sessionId: string,
-): Promise<SupportSessionDetail> {
-  const res = await apiRequest("GET", `/api/support/sessions/${sessionId}`);
+): Promise<SupportSessionDetail | null> {
+  const res = await fetch(`/api/support/sessions/${sessionId}`, {
+    credentials: "include",
+  });
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    throw new Error(`${res.status}: ${text}`);
+  }
+
   return await res.json();
 }
 

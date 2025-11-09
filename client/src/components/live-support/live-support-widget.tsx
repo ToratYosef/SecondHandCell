@@ -74,11 +74,12 @@ export function LiveSupportWidget() {
     }
   }, []);
 
-  const detailQuery = useQuery<SupportSessionDetail>({
+  const detailQuery = useQuery<SupportSessionDetail | null>({
     queryKey: ["support", "session", sessionId],
     queryFn: () => fetchSupportSession(sessionId!),
     enabled: Boolean(sessionId),
     refetchInterval: isOpen ? 4000 : 15000,
+    retry: false,
   });
 
   const sessionDetail = detailQuery.data;
@@ -109,6 +110,23 @@ export function LiveSupportWidget() {
       setSelectedOrderId(sessionDetail.orders[0].id);
     }
   }, [sessionDetail, selectedOrderId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    if (!detailQuery.isSuccess) return;
+    if (sessionDetail !== null) return;
+
+    toast({
+      title: "Starting a fresh chat",
+      description: "We couldn't find your previous conversation, so let's get a new one going.",
+    });
+
+    setSessionId(null);
+    setSelectedOrderId(null);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  }, [detailQuery.isSuccess, sessionDetail, sessionId, toast]);
 
   const createMutation = useMutation({
     mutationFn: createSupportSession,
@@ -192,7 +210,8 @@ export function LiveSupportWidget() {
   };
 
   const unreadCount = session?.unreadForCustomer ?? 0;
-  const isLoading = createMutation.isPending || detailQuery.isLoading;
+  const isLoading =
+    createMutation.isPending || (detailQuery.isFetching && Boolean(sessionId));
 
   const activeOrder = useMemo(() => {
     if (!sessionDetail) return undefined;

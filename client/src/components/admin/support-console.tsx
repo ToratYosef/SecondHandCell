@@ -60,11 +60,12 @@ export function SupportConsole() {
     refetchInterval: 5000,
   });
 
-  const detailQuery = useQuery<SupportSessionDetail>({
+  const detailQuery = useQuery<SupportSessionDetail | null>({
     queryKey: ["support", "session", selectedSessionId, "admin"],
     queryFn: () => fetchSupportSession(selectedSessionId!),
     enabled: Boolean(selectedSessionId),
     refetchInterval: 4000,
+    retry: false,
   });
 
   const sessions = sessionsQuery.data ?? [];
@@ -132,6 +133,26 @@ export function SupportConsole() {
     if (!selectedSessionId || !sessionDetail) return;
     markReadMutation.mutate();
   }, [sessionDetail?.messages.length, selectedSessionId]);
+
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    if (!detailQuery.isSuccess) return;
+    if (sessionDetail !== null) return;
+
+    toast({
+      title: "Session ended",
+      description: "The conversation is no longer available. We've selected the next one for you.",
+    });
+
+    const fallback = sessions.find((session) => session.id !== selectedSessionId) ?? null;
+    if (fallback) {
+      setSelectedSessionId(fallback.id);
+      return;
+    }
+
+    setSelectedSessionId(null);
+    setDraft("");
+  }, [detailQuery.isSuccess, sessionDetail, selectedSessionId, sessions, toast]);
 
   const updateSessionMutation = useMutation({
     mutationFn: async (payload: { status?: SupportSession["status"]; priority?: SupportSession["priority"]; }) => {
