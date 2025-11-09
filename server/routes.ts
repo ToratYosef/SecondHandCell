@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertContactSchema } from "@shared/schema";
+import { insertQuoteSchema, insertContactSchema, updateQuoteSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotes", async (req, res) => {
@@ -32,6 +32,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(quote);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/quotes/:id", async (req, res) => {
+    try {
+      const validatedData = updateQuoteSchema.parse(req.body);
+      const updatedQuote = await storage.updateQuote(req.params.id, validatedData);
+      if (!updatedQuote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      res.json(updatedQuote);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 
