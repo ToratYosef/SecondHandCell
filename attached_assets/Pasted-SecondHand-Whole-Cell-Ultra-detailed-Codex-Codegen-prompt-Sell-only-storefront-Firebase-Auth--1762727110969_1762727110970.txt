@@ -1,0 +1,674 @@
+SecondHand(Whole)Cell — Ultra-detailed Codex / Codegen prompt (Sell-only storefront; Firebase Auth + Firestore)
+
+Create a complete repository called SecondHand(Whole)Cell — a Next.js 14 (TypeScript) e-commerce store for selling phones (B2C + B2B wholesale). Use Firebase Auth (email/password, anonymous, Google), Firestore + firebase-admin for server tasks, Stripe PaymentIntent flow, and ShipEngine for shipping labels (allow mock mode). Build a polished UI using Tailwind CSS with modern glassmorphism (blurry transparent cards) on key pages.
+
+Strict requirements / goals
+
+Functional product: Customers can browse products, add to cart, checkout with Stripe, and view orders/tracking. Admins manage products, stock, orders, discounts, users, and shipping.
+
+Firebase Auth: Email/password, Google sign-in, anonymous sign-in. On signup, create Firestore /users/{uid} record with default role customer.
+
+Firestore: store products, orders, users, discounts, audit logs, webhook events, csvJobs.
+
+Server: Next.js API routes (preferred) plus optional Firebase Functions for heavy jobs.
+
+RBAC: server-side assertRole(context, roles[]) method; admin-only endpoints must call it.
+
+Security: Provide firestore.rules and firebaseAdmin server code. Validate and sanitize CSV uploads and API input (use zod).
+
+UI: Tailwind + accessibility + lightweight animations. Implement glass cards (blurry, semi-transparent) as reusable component.
+
+Testing + CI: Jest unit tests for pricing/stock; Playwright e2e test for shopping flow; GitHub Actions CI.
+
+Mock modes: If Stripe/ShipEngine keys missing, use sandbox mocks.
+
+Deliverable: Repo prints clear quickstart steps; npm run dev starts app; npm run seed seeds sample data.
+
+Repo layout (exact)
+/apps/web/
+  /app/                                # Next.js App Router pages
+    /(public)/                          # public/outside auth
+      page.tsx
+    /products/
+      page.tsx
+      [slug]/page.tsx
+    /cart/
+      page.tsx
+    /checkout/
+      page.tsx
+      success/page.tsx
+      cancel/page.tsx
+    /account/
+      page.tsx
+      /orders/[id]/page.tsx
+    /dashboard/
+      page.tsx
+      /products/page.tsx
+      /orders/page.tsx
+      /inventory/page.tsx
+      /discounts/page.tsx
+      /users/page.tsx
+  /components/
+    GlassCard.tsx
+    Header.tsx
+    Footer.tsx
+    ProductCard.tsx
+    VariantSelector.tsx
+    PriceTierTable.tsx
+    CartDrawer.tsx
+    AdminTable.tsx
+  /lib/
+    firebaseClient.ts
+    firebaseAdmin.ts
+    auth.ts
+    stripeServer.ts
+    shipengineServer.ts
+    pricingEngine.ts
+    rbac.ts
+    validators.ts
+  /styles/
+    globals.css
+    glass.css
+  tailwind.config.js
+  next.config.mjs
+  tsconfig.json
+/apps/functions/ (optional)
+  src/
+    csvProcessor.ts
+    webhookHandler.ts
+    index.ts
+/scripts/
+  seed.ts
+  import_products_csv.ts
+/docs/
+  database.md
+  api-spec.md
+  ui-guidelines.md
+/tests/
+  unit/pricing.test.ts
+  e2e/checkout.spec.ts
+.env.example
+README.md
+package.json
+
+.env.example (exact keys)
+NEXT_PUBLIC_APP_NAME="SecondHand(Whole)Cell"
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+NEXT_PUBLIC_FIREBASE_PROJECT_ID="secondhandwholecell"
+FIREBASE_SERVICE_ACCOUNT_JSON_PATH=./serviceAccountKey.json
+
+# Firebase config (client) - set these to your project or leave blank for dev/test
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
+
+# Stripe
+STRIPE_SECRET_KEY=
+STRIPE_PUBLISHABLE_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# ShipEngine
+SHIPENGINE_API_KEY=
+
+# Email (SendGrid)
+SENDGRID_API_KEY=
+EMAIL_FROM="sales@secondhandwholecell.example.com"
+
+# Dev toggles
+USE_MOCK_STRIPE=true
+USE_MOCK_SHIPENGINE=true
+
+# JWT dev secret for server dev auth
+JWT_DEV_SECRET=changeme_dev_secret
+NODE_ENV=development
+PORT=3000
+
+Firebase Client initialization (file: apps/web/lib/firebaseClient.ts)
+// apps/web/lib/firebaseClient.ts
+import { initializeApp, getApps } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+};
+
+if (!getApps().length) {
+  initializeApp(firebaseConfig);
+}
+
+export const auth = getAuth();
+export const googleProvider = new GoogleAuthProvider();
+export const db = getFirestore();
+export const storage = getStorage();
+
+Firebase Admin initialization (file: apps/web/lib/firebaseAdmin.ts)
+// apps/web/lib/firebaseAdmin.ts
+import admin from "firebase-admin";
+import fs from "fs";
+
+const saPath = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH || "./serviceAccountKey.json";
+const serviceAccount = fs.existsSync(saPath) ? JSON.parse(fs.readFileSync(saPath, "utf8")) : undefined;
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: serviceAccount ? admin.credential.cert(serviceAccount) : admin.credential.applicationDefault(),
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  });
+}
+
+export const adminAuth = admin.auth();
+export const adminDb = admin.firestore();
+export const adminStorage = admin.storage();
+
+
+NOTE: In CI or production use secret manager — do not commit serviceAccountKey.json.
+
+Firestore collections & document shapes (/docs/database.md)
+
+Provide these exact docs and include sample JSON.
+
+products/{productId}
+{
+  "productId": "iphone-13-pro",
+  "sku": "IP13P-128-A-BLUE",
+  "title": "iPhone 13 Pro 128GB - Blue - Grade A",
+  "brand": "Apple",
+  "model": "iPhone 13 Pro",
+  "modelSlug": "iphone-13-pro",
+  "description": "Refurbished iPhone 13 Pro with 128GB storage, Grade A condition.",
+  "images": ["https://cdn.example.com/iphone13-1.jpg", "..."],
+  "variants": [
+    {
+      "variantId": "IPH13P-128-A-BL",
+      "capacity": 128,
+      "grade": "A",
+      "network": "Unlocked",
+      "priceRetail": 64900,
+      "priceWholesale": 62000,
+      "stock": 12,
+      "weightOz": 6.2
+    }
+  ],
+  "priceTiers": [
+    {"minQty": 1, "pricePerUnit": 64900},
+    {"minQty": 5, "pricePerUnit": 62900},
+    {"minQty": 20, "pricePerUnit": 60900}
+  ],
+  "createdAt": "2025-11-09T00:00:00Z"
+}
+
+
+Prices in cents (integers) to avoid float errors.
+
+users/{uid}
+{
+  "uid": "uid_abc123",
+  "email": "buyer@example.com",
+  "displayName": "Buyer Inc.",
+  "role": "customer", // customer | wholesale | admin | fulfillment
+  "company": null,
+  "shippingAddresses": [],
+  "createdAt": "2025-11-09T00:00:00Z"
+}
+
+orders/{orderId}
+{
+  "orderId": "order_001",
+  "orderNumber": "ORD-2025-0001",
+  "userId": "uid_abc123",
+  "items": [
+    {"variantId":"IPH13P-128-A-BL", "productId":"iphone-13-pro", "qty":2, "unitPrice":64900, "lineTotal":129800}
+  ],
+  "subtotal":129800,
+  "discounts":[],
+  "shippingCost":1200,
+  "tax":7800,
+  "total":140800,
+  "payment": { "provider":"stripe", "paymentIntentId":"pi_123", "status":"succeeded" },
+  "shipping": { "carrier":"USPS", "service":"Priority", "tracking":"940011..." , "labelUrl": "https://..." },
+  "status": "paid", // pending | paid | processing | shipped | delivered | cancelled | refunded
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+
+discounts/{id}, adminAuditLogs/{id}, webhookEvents/{id}, csvJobs/{id} — include similar structures.
+Firestore security rules (/infra/firestore.rules)
+
+Provide rules for basic RBAC and write protections. Example skeleton:
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAdmin(); // or implement limited fields for users
+    }
+
+    match /users/{userId} {
+      allow create: if request.auth.uid == userId || isAdmin();
+      allow read: if request.auth.uid == userId || isAdmin();
+      allow update: if request.auth.uid == userId || isAdmin();
+    }
+
+    match /adminAuditLogs/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+    }
+  }
+}
+
+API routes & contracts (server-side) — implement as Next.js /app/api/*/route.ts or /pages/api/* compatible with App Router
+
+List of critical APIs (for each include exact request/response example & server behavior):
+
+POST /api/cart/quote — compute quote (tax + shipping + discounts)
+
+Request
+
+{ "items": [{ "variantId": "IPH13P-128-A-BL", "qty": 2 }], "shippingAddress": { ... }, "couponCode": "SAVE10" }
+
+
+Response
+
+{ "lines":[{variantId, qty, unitPrice, lineTotal}], "subtotal", "discounts", "tax", "shippingOptions":[{carrier, service, cost}], "total" }
+
+
+Server behavior
+
+Validate items exist, calculate price tiers (use pricingEngine)
+
+Call tax stub (lib/tax.ts) to compute tax by address
+
+Call ShipEngine rates or return mock shipping options if USE_MOCK_SHIPENGINE=true
+
+POST /api/checkout — create order + PaymentIntent
+
+Request
+
+{
+  "quoteHash": "hash_or_payload",
+  "userId": "uid_abc123", // optional if authenticated
+  "shippingAddress": {...},
+  "billingAddress": {...},
+  "paymentMethod": "stripe",
+  "currency": "usd"
+}
+
+
+Server flow
+
+Validate quote and re-compute totals.
+
+Reserve stock: decrement reservedQty for each variant (transaction).
+
+Create Firestore orders/{orderId} with status: "pending_payment".
+
+Create Stripe PaymentIntent (use stripeServer.ts) with metadata.orderId.
+
+Return { orderId, clientSecret }.
+
+Response
+
+{ "orderId":"order_001", "clientSecret":"pi_client_secret_..." }
+
+POST /api/webhooks/stripe — handle Stripe events
+
+Verify signature using STRIPE_WEBHOOK_SECRET.
+
+Store raw payload in webhookEvents/{id}.
+
+On payment_intent.succeeded → find order by metadata.orderId or PaymentIntent ID → set order status = paid and finalize stock decrement → send confirmation email via SendGrid.
+
+On charge.refunded → update order status and create audit log.
+
+POST /api/admin/shipping/createLabel — create shipping label (admin only)
+
+Request
+
+{ "orderId": "order_001", "carrier": "usps", "service": "priority" }
+
+
+Server
+
+assertRole(user, ['admin','fulfillment'])
+
+Call shipengineServer.createLabel(order, carrier, service); if USE_MOCK_SHIPENGINE, return fake labelUrl + tracking.
+
+Save to orders/{orderId}.shipping with tracking and labelUrl.
+
+Log adminAuditLogs.
+
+Response
+
+{ "labelUrl": "...", "tracking": "9400..." }
+
+POST /api/admin/products — admin product CRUD (create/edit)
+
+Validate product payload via zod.
+
+Use Firestore transaction when adding variants or adjusting stock.
+
+Log audit.
+
+POST /api/import/products-csv — upload CSV (authenticated admin only)
+
+Accept CSV as multipart/form-data.
+
+Save to Firebase Storage.
+
+Enqueue csvJobs/{jobId} and return jobId.
+
+Worker (apps/functions/csvProcessor.ts) processes CSV (streaming), validates rows, and inserts/updates products in batches.
+
+Pricing engine (apps/web/lib/pricingEngine.ts)
+
+Input: variant doc, qty, userRole, activeDiscounts[], priceTiers[]
+
+Compute:
+
+choose applicable tier (largest minQty <= qty)
+
+compute base price → apply discounts (percent then fixed), apply user-level wholesale price if role=wholesale
+
+rounding to cents
+
+Return { unitPrice, breakdown: { basePrice, tierApplied, discountsApplied, finalUnit } }
+
+Add Jest tests validating:
+
+tier selection
+
+discount stacking
+
+rounding to nearest cent
+
+wholesale role override
+
+Stock reservation logic
+
+When user initiates checkout, call server POST /api/reserve to reserve stock.
+
+Server-side: transaction increases reservedQty and ensures stock - reservedQty >= requestedQty.
+
+Reservation TTL: store reservedUntil timestamp; background worker or cron clears expired reservations.
+
+On Stripe success, reservation becomes permanent (decrement stock, set reservedQty -= qty).
+
+On payment failure or cancel, release reservation.
+
+UI Components — glass / blurry cards (file: apps/web/components/GlassCard.tsx + CSS)
+
+Tailwind setup: add backdrop-filter plugin in tailwind.config.js. Include glass.css with fallback.
+
+GlassCard.tsx:
+
+import React from "react";
+
+export default function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={
+        "rounded-2xl p-6 bg-white/10 border border-white/10 backdrop-blur-md shadow-md " +
+        "ring-1 ring-white/5 " +
+        className
+      }
+      style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02))" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+
+CSS (apps/web/styles/glass.css) — ensure backdrop-filter support and fallback:
+
+/* glass.css */
+:root {
+  --glass-bg: rgba(255,255,255,0.04);
+  --glass-border: rgba(255,255,255,0.08);
+}
+
+.glass {
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  border-radius: 1rem;
+}
+
+
+Tailwind classes to use across UI:
+bg-white/5 border-white/10 backdrop-blur-md shadow-xl rounded-2xl p-6
+
+Use GlassCard for:
+
+Product cards on catalog hover
+
+Product detail hero
+
+Cart drawer and checkout summary
+
+Admin KPI cards on dashboard
+
+Add subtle hover: hover:scale-[1.01] transition-transform duration-200.
+
+ProductCard (uses GlassCard)
+
+ProductCard.tsx stub:
+
+import GlassCard from "./GlassCard";
+
+export default function ProductCard({product}:{product:any}) {
+  return (
+    <GlassCard className="flex flex-col">
+      <img src={product.images?.[0]} alt={product.title} className="w-full h-48 object-contain rounded-md" />
+      <h3 className="mt-3 text-lg font-semibold">{product.title}</h3>
+      <p className="text-sm text-neutral-300">{product.brand} • {product.model}</p>
+      <div className="mt-4 flex items-center justify-between">
+        <div className="text-xl font-bold">${(product.variants[0].priceRetail/100).toFixed(2)}</div>
+        <button className="btn-primary px-4 py-2 rounded-md">Add</button>
+      </div>
+    </GlassCard>
+  )
+}
+
+Checkout design & Stripe integration
+
+Use Stripe Elements on /checkout for card input; allow PaymentIntent confirm on client.
+
+Create PaymentIntent server-side with amount in cents and metadata.orderId.
+
+Use payment_intent.succeeded webhook to finalize order.
+
+Server helper apps/web/lib/stripeServer.ts:
+
+import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock", { apiVersion: "2022-11-15" });
+
+export async function createPaymentIntent(amount:number, currency='usd', metadata={}) {
+  if (process.env.USE_MOCK_STRIPE === 'true') {
+    return { client_secret: `mock_client_secret_${Date.now()}` };
+  }
+  return stripe.paymentIntents.create({ amount, currency, metadata, automatic_payment_methods: { enabled: true } });
+}
+
+
+Webhook handler similarly mocks when USE_MOCK_STRIPE=true.
+
+ShipEngine server helper (shipengineServer.ts)
+
+createLabel(order, carrier, service) returns { labelUrl, trackingNumber }.
+
+If USE_MOCK_SHIPENGINE=true, return { labelUrl: 'https://mock/label.pdf', trackingNumber: 'MOCKTRACK123' }.
+
+Admin controls
+
+Product CRUD: Admin page with form to add variant(s) and images; images upload to Firebase Storage.
+
+Inventory: Admin may increment/decrement stock; each operation writes adminAuditLogs with actorId + change.
+
+Orders: Admin may search, filter, bulk mark as shipped (calls createLabel), and export CSV for shipments.
+
+Discounts: Create coupon codes with usageLimit, validity period and minOrderValue.
+
+Users: Promote/demote roles; approve wholesale accounts (toggle wholesaleApproved flag).
+
+Audit logs: searchable listing of adminAuditLogs.
+
+All admin endpoints call assertRole(reqUser, ['admin','fulfillment']) and then log to adminAuditLogs.
+
+CSV import & seed script
+
+scripts/seed.ts must create:
+
+admin user (email/password printed)
+
+retail user & wholesale user
+
+10 products across Apple / Samsung / Pixel with multiple variants and price tiers
+
+3 sample orders with different statuses: paid, processing, shipped
+
+docs/csv-products-template.csv with columns:
+sku,title,brand,model,variantId,capacity,grade,network,priceRetail,priceWholesale,stock,imageUrl,tier1_min,tier1_price,...
+
+Implement scripts/import_products_csv.ts to parse CSV using fast-csv, validate rows, and upsert products.
+
+Tests
+Unit (Jest)
+
+tests/unit/pricing.test.ts:
+
+test tier selection & price calculation
+
+test discount stacking
+
+test rounding & wholesale override
+
+E2E (Playwright)
+
+tests/e2e/checkout.spec.ts:
+
+seed DB
+
+open site, add product to cart
+
+checkout with mock Stripe (or Stripe test keys)
+
+assert order created in Firestore and status=paid on webhook simulation
+
+assert admin can create label and that orders/{id}.shipping.tracking updated
+
+GitHub Actions CI (simple)
+
+.github/workflows/ci.yml:
+
+runs on push
+
+steps: checkout, node install, npm ci, npm run test, npm run build
+
+uses secrets for FIREBASE and STRIPE only if present; else uses mock mode.
+
+Accessibility & UX details
+
+Use semantic HTML, aria labels, keyboard-navigable form controls.
+
+Provide grade example modal with photos and description.
+
+On product page:
+
+Price tier table (show savings)
+
+Wholesale CTA: Request Invoice button if not auto-checkout for wholesale users
+
+Cart:
+
+Show stock availability and warning if reserved/low stock
+
+Apply coupon modal
+
+Checkout:
+
+Shipping address autocompletion optional
+
+Show estimated tax and shipping before confirmation
+
+After order:
+
+Order timeline (Payment → Processing → Shipped → Delivered)
+
+Downloadable invoice PDF (generate via serverless PDF library or mock)
+
+UI Theme / design tokens (Tailwind config snippet)
+
+tailwind.config.js should include:
+
+module.exports = {
+  content: ['./apps/web/**/*.{ts,tsx,js,jsx,html}'],
+  theme: {
+    extend: {
+      colors: {
+        primary: '#0EA5A4',
+        accent: '#7C3AED',
+        glassBorder: 'rgba(255,255,255,0.08)'
+      },
+      backdropBlur: { xs: '4px', md: '8px' }
+    }
+  },
+  plugins: [
+    require('@tailwindcss/forms'),
+    // enable backdrop filters via plugin if needed
+  ],
+}
+
+README Quickstart (to include in repo)
+
+cp .env.example .env and fill real keys or leave USE_MOCK_* toggles to true.
+
+npm ci
+
+npm run seed — prints test admin credentials (email/password)
+
+npm run dev — open http://localhost:3000
+
+To test Stripe flows:
+
+if using mock: USE_MOCK_STRIPE=true (default)
+
+if using Stripe test keys: set STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY, set USE_MOCK_STRIPE=false, then use test card 4242 4242 4242 4242
+
+To test Google Auth locally: configure OAuth client in Firebase console or use dev-mode email/password.
+
+Acceptance criteria (must pass)
+
+npm run dev starts site with Firebase client & server helper; admin UI accessible via seeded admin account.
+
+Customers can add product to cart, go to checkout, create PaymentIntent (mock or real), and order document created in Firestore with status transitions.
+
+Admin can add product, update stock, and create shipping labels (mock mode allowed).
+
+Pricing engine unit tests pass and Playwright e2e passes for mock mode.
+
+Glass / blurry transparent cards are implemented as reusable GlassCard component and used across the UI.
