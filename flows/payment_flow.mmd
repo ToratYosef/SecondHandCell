@@ -1,0 +1,8 @@
+flowchart TD
+  Buyer --> Cart[/Wholesale checkout/]
+  Cart --> API[POST /api/wholesale/orders/checkout]
+  API --> Stripe[StripeAdapter]
+  Stripe --> API
+  API --> Orders[(wholesaleOrders)]
+  Stripe --> Webhook[/Stripe webhook/]
+  Webhook --> Orders

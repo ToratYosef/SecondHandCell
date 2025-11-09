@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    { "id": "U", "label": "Customer" },
+    { "id": "Sell", "label": "Sell quote page" },
+    { "id": "Form", "label": "Submit quote" },
+    { "id": "API", "label": "POST /api/submit-order" },
+    { "id": "Store", "label": "Firestore orders" },
+    { "id": "Mirror", "label": "users/{uid}/orders" },
+    { "id": "Notify", "label": "Email + Push" }
+  ],
+  "edges": [
+    { "from": "U", "to": "Sell", "label": "visits" },
+    { "from": "Sell", "to": "Form", "label": "fills device details" },
+    { "from": "Form", "to": "API", "label": "submits" },
+    { "from": "API", "to": "Store", "label": "transaction" },
+    { "from": "API", "to": "Mirror", "label": "mirror order" },
+    { "from": "API", "to": "Notify", "label": "emails & push" }
+  ]
+}

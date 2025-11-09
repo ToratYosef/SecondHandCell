@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    { "id": "Scheduler", "label": "Scheduler" },
+    { "id": "Script", "label": "SellCell scraper" },
+    { "id": "Config", "label": "config.yaml" },
+    { "id": "Fetch", "label": "Fetch offers" },
+    { "id": "Compare", "label": "Select max price" },
+    { "id": "XML", "label": "pricingFeeds" },
+    { "id": "Publish", "label": "Updated feed" }
+  ],
+  "edges": [
+    { "from": "Scheduler", "to": "Script", "label": "trigger" },
+    { "from": "Script", "to": "Config", "label": "load mappings" },
+    { "from": "Script", "to": "Fetch", "label": "fetch URLs" },
+    { "from": "Fetch", "to": "Compare", "label": "evaluate" },
+    { "from": "Compare", "to": "XML", "label": "write" },
+    { "from": "XML", "to": "Publish", "label": "publish" }
+  ]
+}
