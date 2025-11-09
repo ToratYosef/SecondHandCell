@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    { "id": "Admin", "label": "Admin" },
+    { "id": "Dashboard", "label": "Admin dashboard" },
+    { "id": "Query", "label": "GET /api/orders" },
+    { "id": "Store", "label": "Firestore orders" },
+    { "id": "Update", "label": "POST /api/orders/:id/status" },
+    { "id": "Audit", "label": "adminAuditLogs" }
+  ],
+  "edges": [
+    { "from": "Admin", "to": "Dashboard", "label": "opens" },
+    { "from": "Dashboard", "to": "Query", "label": "loads queue" },
+    { "from": "Query", "to": "Store", "label": "reads" },
+    { "from": "Dashboard", "to": "Update", "label": "updates" },
+    { "from": "Update", "to": "Store", "label": "writes" },
+    { "from": "Update", "to": "Audit", "label": "logs" }
+  ]
+}
