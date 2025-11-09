@@ -10,6 +10,8 @@ import Devices from "@/pages/devices";
 import HowItWorksPage from "@/pages/how-it-works";
 import Contact from "@/pages/contact";
 import NotFound from "@/pages/not-found";
+import AdminPage from "@/pages/admin";
+import ThankYouPage from "@/pages/thank-you";
 
 function Router() {
   return (
@@ -19,6 +21,8 @@ function Router() {
       <Route path="/devices" component={Devices} />
       <Route path="/how-it-works" component={HowItWorksPage} />
       <Route path="/contact" component={Contact} />
+      <Route path="/admin" component={AdminPage} />
+      <Route path="/thank-you/:id" component={ThankYouPage} />
       <Route component={NotFound} />
     </Switch>
   );
