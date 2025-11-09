@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    { "id": "Stripe", "label": "Stripe" },
+    { "id": "Webhook", "label": "Webhook endpoint" },
+    { "id": "Verify", "label": "Verify signature" },
+    { "id": "Update", "label": "Firestore wholesaleOrders" },
+    { "id": "ShipEngine", "label": "ShipEngine" },
+    { "id": "Webhook2", "label": "Tracking webhook" },
+    { "id": "Sync", "label": "Update tracking" },
+    { "id": "Orders", "label": "Firestore orders" }
+  ],
+  "edges": [
+    { "from": "Stripe", "to": "Webhook", "label": "event" },
+    { "from": "Webhook", "to": "Verify", "label": "constructEvent" },
+    { "from": "Verify", "to": "Update", "label": "persist" },
+    { "from": "ShipEngine", "to": "Webhook2", "label": "tracking" },
+    { "from": "Webhook2", "to": "Sync", "label": "process" },
+    { "from": "Sync", "to": "Orders", "label": "write" }
+  ]
+}

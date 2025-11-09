@@ -1,0 +1,7 @@
+flowchart TD
+  Scheduler --> Script[SellCell scraper]
+  Script --> Config[config.yaml]
+  Script --> Fetch[Fetch offers]
+  Fetch --> Compare[Select max price]
+  Compare --> XML[(pricingFeeds)]
+  XML --> Publish[[Updated feed]]
