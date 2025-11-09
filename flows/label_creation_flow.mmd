@@ -1,0 +1,6 @@
+flowchart TD
+  Admin --> Action[POST /api/generate-label/:id]
+  Action --> Shipping[ShipEngine adapter]
+  Shipping --> Action
+  Action --> Order[(Firestore orders)]
+  Action --> Email[[Customer email]]
