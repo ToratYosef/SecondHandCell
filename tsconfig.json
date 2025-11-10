@@ -5,7 +5,8 @@
     "server/**/*",
     "apps/web/**/*",
     "tests/**/*",
-    "scripts/**/*"
+    "scripts/**/*",
+    "types/**/*"
   ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
@@ -21,11 +22,21 @@
     "allowImportingTsExtensions": true,
     "moduleResolution": "bundler",
     "baseUrl": ".",
-    "types": ["node", "vite/client", "@types/jest"],
+    "typeRoots": ["./types", "./node_modules/@types"],
+    "types": ["node"],
     "paths": {
       "@/*": ["./client/src/*"],
       "@shared/*": ["./shared/*"],
-      "@web/*": ["./apps/web/*"]
+      "@web/*": ["./apps/web/*"],
+      "@assets/*": ["./attached_assets/*"],
+      "next": ["./types/shims/next"],
+      "next/link": ["./types/shims/next-link"],
+      "next/navigation": ["./types/shims/next-navigation"],
+      "next/headers": ["./types/shims/next-headers"],
+      "next/server": ["./types/shims/next-server"],
+      "next/image": ["./types/shims/next-image"],
+      "nodemailer": ["./types/shims/nodemailer"],
+      "@playwright/test": ["./types/shims/playwright"]
     }
   }
 }

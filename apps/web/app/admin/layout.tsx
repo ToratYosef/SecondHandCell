@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { adminAuth } from "@web/lib/firebaseAdmin";
 import { isAdminEmail } from "@web/lib/rbac";
 
-async function ensureAdmin() {
+type AdminSession = { email: string; uid: string };
+
+async function ensureAdmin(): Promise<AdminSession> {
   const cookieStore = cookies();
   const token = cookieStore.get("idToken")?.value || cookieStore.get("__session")?.value;
   if (!token) {
@@ -21,6 +23,7 @@ async function ensureAdmin() {
   } catch (error) {
     console.error("Failed to verify admin token", error);
     redirect("/");
+    throw error;
   }
 }
 

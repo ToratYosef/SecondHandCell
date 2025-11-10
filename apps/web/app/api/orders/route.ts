@@ -92,7 +92,10 @@ export async function POST(request: Request) {
 
   let clientSecret: string | undefined;
   if (payment?.provider === "stripe" && process.env.STRIPE_SECRET_KEY) {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+      // Cast apiVersion due to narrower types in @types/stripe.
+      apiVersion: ("2023-10-16" as unknown) as any,
+    });
     const intent = await stripe.paymentIntents.create({
       amount: Math.round(priceOffered * 100),
       currency: "usd",

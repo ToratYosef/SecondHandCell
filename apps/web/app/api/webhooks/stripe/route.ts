@@ -11,7 +11,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stripe configuration missing" }, { status: 500 });
   }
 
-  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
+  const stripe = new Stripe(STRIPE_SECRET_KEY, {
+    // Cast apiVersion to satisfy @types/stripe's stricter definition.
+    apiVersion: ("2023-10-16" as unknown) as any,
+  });
   const signature = request.headers.get("stripe-signature");
   if (!signature) {
     return NextResponse.json({ error: "Missing Stripe signature" }, { status: 400 });

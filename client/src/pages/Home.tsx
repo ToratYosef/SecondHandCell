@@ -3,12 +3,15 @@ import GlassCard from "@/components/GlassCard";
 import ProductCard from "@/components/ProductCard";
 import { ArrowRight, Shield, Award, Package } from "lucide-react";
 import { Link } from "wouter";
+import type { StaticImageData } from "next/image";
 import heroImage from '@assets/generated_images/Premium_phones_hero_image_be1fafc8.png';
 import qualityImage from '@assets/generated_images/Quality_testing_warehouse_38d87ab2.png';
 import iphoneBlue from '@assets/generated_images/iPhone_13_Pro_Blue_b5275bdb.png';
 import iphoneBlack from '@assets/generated_images/iPhone_13_Pro_Black_0adbf2a8.png';
 import galaxyS21 from '@assets/generated_images/Samsung_Galaxy_S21_Ultra_b0ff5079.png';
 import pixel7 from '@assets/generated_images/Google_Pixel_7_Pro_7213306e.png';
+
+const toImageSrc = (value: string | StaticImageData) => (typeof value === "string" ? value : value.src);
 
 export default function Home() {
   // todo: remove mock functionality
@@ -58,9 +61,9 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${heroImage})` }}
+          style={{ backgroundImage: `url(${toImageSrc(heroImage)})` }}
         >
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
@@ -182,9 +185,9 @@ export default function Home() {
               </ul>
             </div>
             <div className="rounded-2xl overflow-hidden">
-              <img 
-                src={qualityImage} 
-                alt="Quality testing warehouse" 
+              <img
+                src={toImageSrc(qualityImage)}
+                alt="Quality testing warehouse"
                 className="w-full h-auto"
               />
             </div>
