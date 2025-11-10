@@ -5,7 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VariantSelector from "@/components/VariantSelector";
 import PriceTierTable from "@/components/PriceTierTable";
 import { ShoppingCart, Shield, Truck, RefreshCw } from "lucide-react";
+import type { StaticImageData } from "next/image";
 import iphoneBlue from '@assets/generated_images/iPhone_13_Pro_Blue_b5275bdb.png';
+
+const toImageSrc = (value: string | StaticImageData) => (typeof value === "string" ? value : value.src);
 
 export default function ProductDetail() {
   // todo: remove mock functionality
@@ -32,7 +35,7 @@ export default function ProductDetail() {
           <div>
             <div className="aspect-square bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl p-8 mb-4 relative">
               <img
-                src={iphoneBlue}
+                src={toImageSrc(iphoneBlue)}
                 alt="iPhone 13 Pro"
                 className="w-full h-full object-contain"
               />
@@ -43,7 +46,11 @@ export default function ProductDetail() {
             <div className="grid grid-cols-4 gap-2">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer hover-elevate" data-testid={`thumbnail-${i}`}>
-                  <img src={iphoneBlue} alt={`View ${i}`} className="w-full h-full object-contain p-2" />
+                  <img
+                    src={toImageSrc(iphoneBlue)}
+                    alt={`View ${i}`}
+                    className="w-full h-full object-contain p-2"
+                  />
                 </div>
               ))}
             </div>

@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { ShoppingCart, Trash2, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import GlassCard from "./GlassCard";
+import type { StaticImageData } from "next/image";
 
 interface CartItem {
   id: string;
   productId: string;
   title: string;
-  image: string;
+  image: string | StaticImageData;
   variant: string;
   price: number;
   quantity: number;
@@ -52,10 +53,12 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onCh
           ) : (
             <>
               <div className="flex-1 overflow-auto space-y-4">
-                {items.map(item => (
-                  <div key={item.id} className="flex gap-4 pb-4 border-b" data-testid={`cart-item-${item.id}`}>
+                {items.map(item => {
+                  const imageSrc = typeof item.image === "string" ? item.image : item.image.src;
+                  return (
+                    <div key={item.id} className="flex gap-4 pb-4 border-b" data-testid={`cart-item-${item.id}`}>
                     <div className="w-20 h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                      <img src={item.image} alt={item.title} className="w-full h-full object-contain p-2" />
+                      <img src={imageSrc} alt={item.title} className="w-full h-full object-contain p-2" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium line-clamp-1">{item.title}</h4>
@@ -97,7 +100,8 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onCh
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               
               <div className="border-t pt-4 space-y-4">

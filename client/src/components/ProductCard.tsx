@@ -2,12 +2,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import GlassCard from "./GlassCard";
 import { ShoppingCart } from "lucide-react";
+import type { StaticImageData } from "next/image";
 
 interface ProductCardProps {
   id: string;
   title: string;
   brand: string;
-  image: string;
+  image: string | StaticImageData;
   grade: string;
   price: number;
   originalPrice?: number;
@@ -30,13 +31,14 @@ export default function ProductCard({
     B: "bg-blue-500/90 text-white",
     C: "bg-yellow-500/90 text-white",
   };
+  const resolvedImage = typeof image === "string" ? image : image.src;
 
   return (
     <GlassCard className="group cursor-pointer hover-elevate transition-transform hover:scale-[1.02]" onClick={onClick}>
       <div className="p-6" data-testid={`card-product-${title}`}>
         <div className="aspect-square relative mb-4 bg-white/50 dark:bg-white/10 rounded-xl overflow-hidden">
           <img
-            src={image}
+            src={resolvedImage}
             alt={title}
             className="w-full h-full object-contain p-4"
           />

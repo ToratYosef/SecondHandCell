@@ -1,5 +1,13 @@
 {
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
+  "include": [
+    "client/src/**/*",
+    "shared/**/*",
+    "server/**/*",
+    "apps/web/**/*",
+    "tests/**/*",
+    "scripts/**/*",
+    "types/**/*"
+  ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,
@@ -14,10 +22,21 @@
     "allowImportingTsExtensions": true,
     "moduleResolution": "bundler",
     "baseUrl": ".",
-    "types": ["node", "vite/client"],
+    "typeRoots": ["./types", "./node_modules/@types"],
+    "types": ["node"],
     "paths": {
       "@/*": ["./client/src/*"],
-      "@shared/*": ["./shared/*"]
+      "@shared/*": ["./shared/*"],
+      "@web/*": ["./apps/web/*"],
+      "@assets/*": ["./attached_assets/*"],
+      "next": ["./types/shims/next"],
+      "next/link": ["./types/shims/next-link"],
+      "next/navigation": ["./types/shims/next-navigation"],
+      "next/headers": ["./types/shims/next-headers"],
+      "next/server": ["./types/shims/next-server"],
+      "next/image": ["./types/shims/next-image"],
+      "nodemailer": ["./types/shims/nodemailer"],
+      "@playwright/test": ["./types/shims/playwright"]
     }
   }
 }
