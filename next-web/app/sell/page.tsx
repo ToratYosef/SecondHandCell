@@ -2,239 +2,289 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 export default function SellPage() {
-  const router = useRouter();
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    brand: '',
-    model: '',
-    storage: '',
-    condition: '',
-  });
+  const [selectedDevice, setSelectedDevice] = useState('');
+  const [deviceCondition, setDeviceCondition] = useState('');
+  const [quote, setQuote] = useState(null);
 
-  const brands = ['Apple', 'Samsung', 'Google', 'OnePlus', 'Motorola'];
-  const models: { [key: string]: string[] } = {
-    Apple: ['iPhone 15 Pro Max', 'iPhone 15', 'iPhone 14 Pro', 'iPhone 14'],
-    Samsung: ['Galaxy S24 Ultra', 'Galaxy S23', 'Galaxy Z Fold 5', 'Galaxy A54'],
-    Google: ['Pixel 8 Pro', 'Pixel 8', 'Pixel 7 Pro'],
-    OnePlus: ['12 Pro', '11', '10 Pro'],
-    Motorola: ['Edge 50 Pro', 'Razr 50', 'Edge 50'],
-  };
+  const devices = [
+    { name: 'iPhone 15 Pro Max', value: 'iphone-15-pro-max', price: 900, emoji: '📱' },
+    { name: 'iPhone 15 Pro', value: 'iphone-15-pro', price: 800, emoji: '📱' },
+    { name: 'iPhone 14 Pro', value: 'iphone-14-pro', price: 650, emoji: '📱' },
+    { name: 'Samsung Galaxy S24 Ultra', value: 'galaxy-s24-ultra', price: 800, emoji: '📱' },
+    { name: 'Samsung Galaxy S23', value: 'galaxy-s23', price: 550, emoji: '📱' },
+    { name: 'Google Pixel 8 Pro', value: 'pixel-8-pro', price: 700, emoji: '📱' },
+  ];
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const conditions = [
+    { name: 'Excellent', value: 'excellent', multiplier: 1.0, desc: 'No cracks, scratches, or damage' },
+    { name: 'Good', value: 'good', multiplier: 0.85, desc: 'Minor cosmetic damage' },
+    { name: 'Fair', value: 'fair', multiplier: 0.65, desc: 'Visible wear and tear' },
+    { name: 'Poor', value: 'poor', multiplier: 0.4, desc: 'Significant damage' },
+  ];
 
-  const handleNext = () => {
-    if (step === 1 && (!formData.brand || !formData.model || !formData.storage)) {
-      alert('Please fill in all device details');
+  const handleGetQuote = async () => {
+    if (!selectedDevice || !deviceCondition) {
+      alert('Please select both device and condition');
       return;
     }
-    if (step === 2 && !formData.condition) {
-      alert('Please select device condition');
-      return;
-    }
-    if (step < 3) setStep(step + 1);
-  };
 
-  const calculatePrice = () => {
-    const basePrice: { [key: string]: number } = {
-      'iPhone 15 Pro Max': 900,
-      'iPhone 15': 700,
-      'Galaxy S24 Ultra': 800,
-      'Galaxy S23': 600,
-    };
-    
-    const base = basePrice[formData.model] || 500;
-    const conditions: { [key: string]: number } = {
-      'Excellent': 1,
-      'Good': 0.85,
-      'Fair': 0.65,
-      'Poor': 0.4,
-    };
-    
-    const multiplier = conditions[formData.condition] || 0.7;
-    return Math.round(base * multiplier);
+    try {
+      const device = devices.find(d => d.value === selectedDevice);
+      const condition = conditions.find(c => c.value === deviceCondition);
+
+      const response = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: selectedDevice,
+          deviceName: device.name,
+          condition: deviceCondition,
+          conditionName: condition.name,
+        }),
+      });
+
+      const data = await response.json();
+      setQuote(data);
+      setStep(3);
+    } catch (error) {
+      console.error('Error fetching quote:', error);
+      alert('Error getting quote. Please try again.');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50">
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="mb-12 text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Get Your Quote</h1>
-            <p className="text-xl text-gray-600">Step {step} of 3</p>
-          </div>
+    <>
+      {/* Hero Banner */}
+      <section className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 py-16 text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-10 left-10 w-40 h-40 bg-white rounded-full mix-blend-multiply filter blur-3xl"></div>
+          <div className="absolute bottom-10 right-10 w-40 h-40 bg-white rounded-full mix-blend-multiply filter blur-3xl"></div>
+        </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <h1 className="text-5xl md:text-6xl font-extrabold mb-3">Get Your Instant Quote</h1>
+          <p className="text-xl text-indigo-100">It only takes 60 seconds. Your quote is guaranteed for 30 days.</p>
+        </div>
+      </section>
 
+      {/* Main Content */}
+      <section className="py-16 md:py-24 bg-gradient-to-b from-slate-50 to-white">
+        <div className="container mx-auto px-4 max-w-4xl">
           {/* Progress Bar */}
-          <div className="mb-8 flex gap-2">
-            {[1, 2, 3].map(s => (
-              <div key={s} className={`flex-1 h-2 rounded-full transition ${s <= step ? 'bg-indigo-600' : 'bg-gray-300'}`} />
+          <div className="flex justify-between items-center mb-16">
+            {[
+              { num: 1, label: 'Device' },
+              { num: 2, label: 'Condition' },
+              { num: 3, label: 'Quote' }
+            ].map((item, idx) => (
+              <div key={item.num} className="flex items-center flex-1">
+                <div className="flex items-center flex-1">
+                  <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
+                      step >= item.num
+                        ? 'bg-green-500 text-white shadow-lg'
+                        : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {step > item.num ? <i className="fa-solid fa-check"></i> : item.num}
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-semibold text-gray-600">{item.label}</p>
+                  </div>
+                </div>
+                {idx < 2 && (
+                  <div
+                    className={`h-1 flex-1 mx-4 rounded-full transition-all ${
+                      step > item.num ? 'bg-green-500' : 'bg-gray-200'
+                    }`}
+                  />
+                )}
+              </div>
             ))}
           </div>
 
-          {/* Form Container */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            {/* Step 1: Device Selection */}
-            {step === 1 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900">Select Your Device</h2>
-                
-                <div>
-                  <label className="block text-lg font-semibold text-gray-900 mb-3">Brand</label>
-                  <select
-                    name="brand"
-                    value={formData.brand}
-                    onChange={handleInputChange}
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-600"
-                  >
-                    <option value="">Select Brand</option>
-                    {brands.map(b => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {formData.brand && (
-                  <div>
-                    <label className="block text-lg font-semibold text-gray-900 mb-3">Model</label>
-                    <select
-                      name="model"
-                      value={formData.model}
-                      onChange={handleInputChange}
-                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-600"
-                    >
-                      <option value="">Select Model</option>
-                      {models[formData.brand]?.map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {formData.model && (
-                  <div>
-                    <label className="block text-lg font-semibold text-gray-900 mb-3">Storage</label>
-                    <select
-                      name="storage"
-                      value={formData.storage}
-                      onChange={handleInputChange}
-                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-600"
-                    >
-                      <option value="">Select Storage</option>
-                      <option value="64GB">64GB</option>
-                      <option value="128GB">128GB</option>
-                      <option value="256GB">256GB</option>
-                      <option value="512GB">512GB</option>
-                      <option value="1TB">1TB</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 2: Condition Assessment */}
-            {step === 2 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900">Device Condition</h2>
-                
-                <div className="grid gap-4">
-                  {['Excellent', 'Good', 'Fair', 'Poor'].map(cond => (
-                    <label key={cond} className="flex items-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-indigo-600 transition">
-                      <input
-                        type="radio"
-                        name="condition"
-                        value={cond}
-                        checked={formData.condition === cond}
-                        onChange={handleInputChange}
-                        className="w-5 h-5"
-                      />
-                      <span className="ml-3 font-semibold text-gray-900">{cond}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Quote */}
-            {step === 3 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900">Your Quote</h2>
-                
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-8 rounded-xl">
-                  <p className="text-gray-600 mb-2">{formData.brand} {formData.model}</p>
-                  <p className="text-gray-600 mb-4">{formData.storage} • {formData.condition} Condition</p>
-                  
-                  <div className="border-t-2 pt-4 mt-4">
-                    <p className="text-sm text-gray-600 mb-2">Your Offer</p>
-                    <div className="text-5xl font-bold text-green-600 mb-4">${calculatePrice()}</div>
-                    <p className="text-sm text-gray-600">Valid for 30 days</p>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-sm text-blue-900">
-                    ✓ This price is guaranteed
-                    <br />✓ Free shipping included
-                    <br />✓ Fast payment within 24 hours
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Buttons */}
-            <div className="flex gap-4 mt-8">
-              {step > 1 && (
-                <button
-                  onClick={() => setStep(step - 1)}
-                  className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-900 font-semibold rounded-lg hover:bg-gray-50 transition"
-                >
-                  Back
-                </button>
-              )}
+          {/* Step 1: Select Device */}
+          {step === 1 && (
+            <div className="animate-fade-in-up">
+              <h2 className="text-3xl font-bold mb-2 text-slate-900">What device are you selling?</h2>
+              <p className="text-gray-600 mb-8">Select your device model to get started.</p>
               
-              {step < 3 ? (
-                <button
-                  onClick={handleNext}
-                  className="flex-1 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition"
-                >
-                  Next
-                </button>
-              ) : (
-                <Link
-                  href="/account"
-                  className="flex-1 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition text-center"
-                >
-                  Checkout
-                </Link>
-              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                {devices.map((device) => (
+                  <button
+                    key={device.value}
+                    onClick={() => setSelectedDevice(device.value)}
+                    className={`p-5 border-2 rounded-xl text-left transition-all transform hover:scale-102 ${
+                      selectedDevice === device.value
+                        ? 'border-green-500 bg-green-50 shadow-lg'
+                        : 'border-gray-200 bg-white hover:border-green-300 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-bold text-slate-900">{device.name}</p>
+                        <p className="text-sm text-green-600 font-semibold mt-1">Up to ${device.price}</p>
+                      </div>
+                      <span className="text-2xl">{device.emoji}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              
+              <button
+                onClick={() => setStep(2)}
+                disabled={!selectedDevice}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-300 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-102 text-lg"
+              >
+                Continue <i className="fa-solid fa-arrow-right ml-2"></i>
+              </button>
             </div>
-          </div>
+          )}
 
-          {/* Trust Section */}
-          <div className="mt-12 grid md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-3xl mb-2">🔒</div>
-              <h3 className="font-semibold text-gray-900">Secure</h3>
-              <p className="text-sm text-gray-600">Your data is protected</p>
+          {/* Step 2: Select Condition */}
+          {step === 2 && (
+            <div className="animate-fade-in-up">
+              <h2 className="text-3xl font-bold mb-2 text-slate-900">What's the condition?</h2>
+              <p className="text-gray-600 mb-8">Select the condition that best describes your device.</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                {conditions.map((condition) => (
+                  <button
+                    key={condition.value}
+                    onClick={() => setDeviceCondition(condition.value)}
+                    className={`p-6 border-2 rounded-xl text-left transition-all transform hover:scale-102 ${
+                      deviceCondition === condition.value
+                        ? 'border-green-500 bg-green-50 shadow-lg'
+                        : 'border-gray-200 bg-white hover:border-green-300 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <p className="font-bold text-slate-900">{condition.name}</p>
+                      <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        deviceCondition === condition.value
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {Math.round(condition.multiplier * 100)}%
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600">{condition.desc}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setStep(1)}
+                  className="flex-1 border-2 border-slate-300 text-slate-700 font-bold py-4 px-6 rounded-xl hover:bg-slate-50 transition-all"
+                >
+                  <i className="fa-solid fa-arrow-left mr-2"></i> Back
+                </button>
+                <button
+                  onClick={handleGetQuote}
+                  disabled={!deviceCondition}
+                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-300 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-102"
+                >
+                  Get My Quote <i className="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl mb-2">✓</div>
-              <h3 className="font-semibold text-gray-900">Guaranteed</h3>
-              <p className="text-sm text-gray-600">30-day price lock</p>
+          )}
+
+          {/* Step 3: Quote Result */}
+          {step === 3 && quote && (
+            <div className="animate-fade-in-up">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-8 rounded-2xl border-2 border-green-200 shadow-lg mb-8">
+                <div className="text-center mb-8">
+                  <div className="inline-block bg-green-500 text-white rounded-full p-4 mb-4">
+                    <i className="fa-solid fa-check text-2xl"></i>
+                  </div>
+                  <h2 className="text-4xl font-extrabold text-green-600 mb-2">Your Quote is Ready!</h2>
+                  <p className="text-gray-700">Price guarantee valid for 30 days</p>
+                </div>
+
+                <div className="bg-white p-8 rounded-xl mb-6 border-2 border-green-200 shadow-md">
+                  <div className="grid md:grid-cols-3 gap-6 text-center">
+                    <div>
+                      <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Device</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-2">{quote.deviceName}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Condition</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-2">{quote.conditionName}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Quote ID</p>
+                      <p className="text-xl font-bold text-slate-900 mt-2 font-mono">{quote.quoteId}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-xl mb-6 text-center border-4 border-green-400 shadow-md">
+                  <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider mb-3">Your Quote</p>
+                  <div className="text-6xl font-extrabold text-green-600">
+                    ${quote.quote}
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-6 rounded-xl mb-8 border border-blue-200">
+                  <div className="flex gap-4">
+                    <i className="fa-solid fa-circle-info text-blue-600 text-xl flex-shrink-0 mt-1"></i>
+                    <div>
+                      <p className="font-semibold text-blue-900 mb-2">How it works:</p>
+                      <p className="text-sm text-blue-800">
+                        1) Ship your device using our prepaid label. 2) We inspect it within 1-2 business days. 3) Get paid via Venmo, Zelle, or PayPal within 24 hours of inspection. Your quote is locked for 30 days.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button
+                    onClick={() => {
+                      setStep(1);
+                      setSelectedDevice('');
+                      setDeviceCondition('');
+                      setQuote(null);
+                    }}
+                    className="flex-1 border-2 border-slate-300 text-slate-700 font-bold py-4 px-6 rounded-xl hover:bg-slate-50 transition-all"
+                  >
+                    <i className="fa-solid fa-rotate-left mr-2"></i> Get Another Quote
+                  </button>
+                  <Link
+                    href="/account"
+                    className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-102 text-center inline-block"
+                  >
+                    Next: Shipping Details <i className="fa-solid fa-arrow-right ml-2"></i>
+                  </Link>
+                </div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl mb-2">⚡</div>
-              <h3 className="font-semibold text-gray-900">Fast</h3>
-              <p className="text-sm text-gray-600">Payment in 24 hours</p>
-            </div>
+          )}
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4 max-w-3xl">
+          <h2 className="text-3xl font-bold text-center mb-12 text-slate-900">Frequently Asked Questions</h2>
+          <div className="space-y-4">
+            {[
+              { q: 'How long is my quote valid?', a: 'Your quote is guaranteed for 30 days from the date you receive it.' },
+              { q: 'Do you offer free shipping?', a: 'Yes! We provide a prepaid shipping kit with every quote.' },
+              { q: 'How long does inspection take?', a: 'We typically inspect devices within 1-2 business days of receiving them.' },
+              { q: 'What payment methods do you accept?', a: 'We offer Venmo, Zelle, PayPal, and direct bank transfer.' },
+            ].map((faq, idx) => (
+              <div key={idx} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition">
+                <p className="font-semibold text-slate-900 mb-2">{faq.q}</p>
+                <p className="text-gray-600">{faq.a}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }
