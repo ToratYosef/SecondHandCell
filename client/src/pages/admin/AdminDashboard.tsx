@@ -1,28 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Package, FileText, Users, TrendingUp, DollarSign } from "lucide-react";
-import type { Company, Order } from "@shared/schema";
 
 export default function AdminDashboard() {
-  const { data: companies } = useQuery<Company[]>({
+  const { data: companies } = useQuery({
     queryKey: ["/api/admin/companies"],
   });
 
-  const { data: orders } = useQuery<Order[]>({
+  const { data: orders } = useQuery({
     queryKey: ["/api/orders"],
   });
 
-  const companyList = companies ?? [];
-  const orderList = orders ?? [];
-
-  const pendingCompanies = companyList.filter((company) => company.status === "pending_review").length;
-  const activeOrders = orderList.filter((order) => order.status !== "completed" && order.status !== "cancelled").length;
-  const totalRevenue = orderList.reduce((sum, order) => sum + parseFloat(order.total), 0);
+  const pendingCompanies = companies?.filter((c: any) => c.status === "pending").length || 0;
+  const activeOrders = orders?.filter((o: any) => o.status !== "delivered").length || 0;
+  const totalRevenue = orders?.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount), 0) || 0;
 
   const stats = [
     {
       title: "Total Companies",
-      value: companyList.length,
+      value: companies?.length || 0,
       icon: Building2,
       description: `${pendingCompanies} pending approval`,
     },
@@ -77,7 +73,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {orderList.slice(0, 5).map((order) => (
+              {orders?.slice(0, 5).map((order: any) => (
                 <div key={order.id} className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">Order #{order.orderNumber}</p>
@@ -85,7 +81,7 @@ export default function AdminDashboard() {
                       {new Date(order.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <p className="font-semibold">${order.total}</p>
+                  <p className="font-semibold">${order.totalAmount}</p>
                 </div>
               ))}
             </div>

@@ -114,11 +114,11 @@ export default function BuyerCatalog() {
       <main className="flex-1">
         {/* Header */}
         <section className="border-b bg-muted/30 py-12">
-          <div className="container px-4 sm:px-6 lg:px-8">
-            <h1 className="mb-4 text-4xl font-bold tracking-tight" data-testid="text-catalog-headline">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <h1 className="mb-4 text-4xl font-bold tracking-tight text-center sm:text-left" data-testid="text-catalog-headline">
               Wholesale Device Catalog
             </h1>
-            <p className="max-w-2xl text-lg text-muted-foreground">
+            <p className="max-w-2xl text-lg text-muted-foreground text-center sm:text-left">
               Browse our certified pre-owned devices with wholesale tiered pricing
             </p>
           </div>
@@ -126,7 +126,7 @@ export default function BuyerCatalog() {
 
         {/* Catalog Content */}
         <section className="py-12">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {/* Filters */}
             <div className="mb-8 space-y-4">
               {/* Search and Filters */}

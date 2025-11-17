@@ -171,11 +171,7 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground flex min-h-screen flex-col items-center text-center;
-  }
-
-  #root {
-    @apply flex w-full flex-1 flex-col items-center;
+    @apply font-sans antialiased bg-background text-foreground;
   }
 }
 

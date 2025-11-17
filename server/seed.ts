@@ -250,22 +250,12 @@ async function seed() {
     // Create demo admin user
     console.log("Creating demo admin user...");
     const adminPassword = await bcrypt.hash("Admin123!", 10);
-    await storage.createUser({
+    const adminUser = await storage.createUser({
       name: "Admin User",
       email: "admin@secondhandwholecell.test",
       passwordHash: adminPassword,
       role: "admin",
       phone: "+1-555-0100",
-      isActive: true,
-    });
-
-    const salesAdminPassword = await bcrypt.hash("Admin123?", 10);
-    await storage.createUser({
-      name: "Sales Admin",
-      email: "sales@secondhandcell.com",
-      passwordHash: salesAdminPassword,
-      role: "admin",
-      phone: "+1-555-0300",
       isActive: true,
     });
 

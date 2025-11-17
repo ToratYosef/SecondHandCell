@@ -58,7 +58,7 @@ export default function About() {
       <main className="flex-1">
         {/* Hero */}
         <section className="border-b bg-muted/30 py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="mb-6 text-4xl font-bold tracking-tight lg:text-5xl" data-testid="text-about-headline">
                 About SecondHand(Whole)Cell
@@ -72,7 +72,7 @@ export default function About() {
 
         {/* Company Story */}
         <section className="py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl">
               <h2 className="mb-6 text-3xl font-semibold lg:text-4xl" data-testid="text-our-story">
                 Our Story
@@ -94,7 +94,7 @@ export default function About() {
 
         {/* Grading Standards */}
         <section className="border-t bg-muted/30 py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-grading-standards">
                 Our Grading Standards
@@ -125,7 +125,7 @@ export default function About() {
 
         {/* Team */}
         <section className="border-t py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-team">
                 Leadership Team
@@ -151,7 +151,7 @@ export default function About() {
 
         {/* Timeline */}
         <section className="border-t bg-muted/30 py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-milestones">
                 Our Journey
@@ -180,7 +180,7 @@ export default function About() {
 
         {/* Values */}
         <section className="border-t py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-values">
                 Our Values

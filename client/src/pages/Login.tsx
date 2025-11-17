@@ -96,7 +96,7 @@ export default function Login() {
       <UnifiedHeader />
       
       <main className="flex flex-1 items-center justify-center py-16">
-        <div className="container px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Card className="mx-auto max-w-md">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl" data-testid="text-login-title">

@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { FileText, Search, DollarSign, Package } from "lucide-react";
-import type { Quote, QuoteItem, DeviceVariant, DeviceModel } from "@shared/schema";
+import type { Quote } from "@shared/schema";
 
 interface QuoteWithCompany extends Quote {
   company: {
@@ -20,15 +20,6 @@ interface QuoteWithCompany extends Quote {
     name: string;
     contactEmail: string;
   };
-}
-
-interface QuoteWithItems extends Quote {
-  items: Array<
-    QuoteItem & {
-      variant: DeviceVariant | null;
-      model: DeviceModel | null;
-    }
-  >;
 }
 
 export default function AdminQuotes() {
@@ -48,7 +39,7 @@ export default function AdminQuotes() {
     queryKey: ["/api/admin/quotes"],
   });
 
-  const { data: quoteDetails } = useQuery<QuoteWithItems | null>({
+  const { data: quoteDetails } = useQuery({
     queryKey: ["/api/quotes", selectedQuote?.id],
     enabled: !!selectedQuote?.id && editDialogOpen,
   });
@@ -94,12 +85,15 @@ export default function AdminQuotes() {
 
   const updateQuoteMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("PATCH", `/api/quotes/${selectedQuote!.id}`, {
-        status: newStatus,
-        subtotal,
-        shippingEstimate,
-        taxEstimate,
-        totalEstimate,
+      return await apiRequest(`/api/quotes/${selectedQuote!.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: newStatus,
+          subtotal,
+          shippingEstimate,
+          taxEstimate,
+          totalEstimate,
+        }),
       });
     },
     onSuccess: () => {
@@ -251,12 +245,12 @@ export default function AdminQuotes() {
           </DialogHeader>
 
           <div className="space-y-6">
-            {quoteDetails && quoteDetails.items.length > 0 && (
+            {quoteDetails?.items && quoteDetails.items.length > 0 && (
               <div className="space-y-2">
                 <Label>Quote Items</Label>
                 <div className="border rounded-md">
-                  {quoteDetails.items.map((item, idx) => (
-                    <div key={item.id ?? idx} className="p-3 border-b last:border-0">
+                  {quoteDetails.items.map((item: any, idx: number) => (
+                    <div key={idx} className="p-3 border-b last:border-0">
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-medium">

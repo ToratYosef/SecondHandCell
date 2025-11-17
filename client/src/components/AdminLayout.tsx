@@ -55,15 +55,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   };
 
   const SidebarContent = () => (
-    <div className="flex h-full flex-col items-center text-center">
-      <div className="w-full border-b p-6">
+    <div className="flex h-full flex-col">
+      <div className="p-6 border-b">
         <h2 className="text-xl font-semibold">Admin Portal</h2>
         {user && (
-          <p className="mt-1 text-sm text-muted-foreground">{user.name}</p>
+          <p className="text-sm text-muted-foreground mt-1">{user.name}</p>
         )}
       </div>
 
-      <nav className="flex-1 w-full space-y-1 p-4">
+      <nav className="flex-1 p-4 space-y-1">
         {navigation.map((item) => {
           const isActive = location === item.href || location.startsWith(item.href + "/");
           return (
@@ -71,7 +71,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <Button
                 variant={isActive ? "secondary" : "ghost"}
                 className={cn(
-                  "w-full justify-center",
+                  "w-full justify-start",
                   isActive && "bg-accent"
                 )}
                 data-testid={`nav-${item.name.toLowerCase().replace(" ", "-")}`}
@@ -85,10 +85,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      <div className="w-full border-t p-4">
+      <div className="p-4 border-t">
         <Button
           variant="ghost"
-          className="w-full justify-center"
+          className="w-full justify-start"
           onClick={handleLogout}
           data-testid="button-logout"
         >
@@ -100,9 +100,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen w-full flex-col items-center text-center md:flex-row">
+    <div className="flex h-screen">
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:border-r md:text-center">
+      <div className="hidden md:flex md:w-64 md:flex-col md:border-r">
         <SidebarContent />
       </div>
 
@@ -112,23 +112,21 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           <Button
             variant="ghost"
             size="icon"
-            className="fixed left-1/2 top-4 z-50 -translate-x-1/2"
+            className="fixed top-4 left-4 z-50"
             data-testid="button-mobile-menu"
           >
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0 text-center">
+        <SheetContent side="left" className="p-0 w-64">
           <SidebarContent />
         </SheetContent>
       </Sheet>
 
       {/* Main Content */}
-      <div className="flex flex-1 flex-col items-center overflow-hidden">
-        <main className="flex-1 w-full overflow-y-auto p-6 text-center md:p-8">
-          <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
-            {children}
-          </div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+          {children}
         </main>
       </div>
     </div>

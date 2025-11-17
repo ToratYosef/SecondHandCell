@@ -41,7 +41,7 @@ export default function Support() {
       <main className="flex-1">
         {/* Header */}
         <section className="border-b bg-muted/30 py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="mb-4 text-4xl font-bold tracking-tight lg:text-5xl" data-testid="text-support-headline">
                 Support & Contact
@@ -55,7 +55,7 @@ export default function Support() {
 
         {/* Content */}
         <section className="py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-2">
               {/* Contact Information */}
               <div>

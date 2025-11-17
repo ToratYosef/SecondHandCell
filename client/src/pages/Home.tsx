@@ -91,7 +91,7 @@ export default function Home() {
           {/* Dark gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/70" />
           
-          <div className="container relative z-10 px-4 py-24 text-center sm:px-6 lg:px-8">
+          <div className="relative z-10 mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
             <h1 className="mb-6 text-5xl font-bold tracking-tight text-white lg:text-6xl" data-testid="text-hero-headline">
               Wholesale Devices, Done Right.
             </h1>
@@ -118,7 +118,7 @@ export default function Home() {
 
         {/* How It Works */}
         <section className="border-b bg-background py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-how-it-works">
                 How It Works
@@ -149,7 +149,7 @@ export default function Home() {
 
         {/* Key Benefits */}
         <section className="bg-muted/30 py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-key-benefits">
                 Why Wholesale Buyers Choose Us
@@ -173,7 +173,7 @@ export default function Home() {
 
         {/* Featured Categories */}
         <section className="border-b py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-featured-categories">
                 Shop by Category
@@ -205,7 +205,7 @@ export default function Home() {
 
         {/* Testimonials */}
         <section className="bg-muted/30 py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-testimonials">
                 Trusted by Industry Leaders
@@ -229,7 +229,7 @@ export default function Home() {
 
         {/* CTA Banner */}
         <section className="border-t bg-primary py-16 text-primary-foreground">
-          <div className="container px-4 text-center sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
             <h2 className="mb-4 text-3xl font-semibold lg:text-4xl" data-testid="text-cta-banner">
               Ready to see pricing?
             </h2>

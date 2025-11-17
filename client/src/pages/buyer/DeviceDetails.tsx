@@ -13,31 +13,18 @@ import { ConditionBadge } from "@/components/ConditionBadge";
 import { SaveToListButton } from "@/components/SaveToListButton";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
-import type { DeviceModel, DeviceVariant, InventoryItem, PriceTier } from "@shared/schema";
-
-type DeviceVariantWithDetails = DeviceVariant & {
-  inventory: InventoryItem | null;
-  priceTiers: PriceTier[];
-  deviceModel: DeviceModel;
-};
-
-type DeviceModelWithVariants = DeviceModel & {
-  variants: DeviceVariantWithDetails[];
-};
 
 export default function DeviceDetails() {
   const [, params] = useRoute("/buyer/devices/:slug");
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const { data: devices, isLoading } = useQuery<DeviceModelWithVariants[]>({
+  const { data: devices, isLoading } = useQuery({
     queryKey: ["/api/catalog"],
   });
 
-  const device = devices?.find((model) => model.slug === params?.slug);
-  const deviceDisplayName = device ? device.marketingName ?? `${device.brand} ${device.name}` : "";
-  const selectedVariant =
-    device?.variants?.find((variant) => variant.id === selectedVariantId) || device?.variants?.[0];
+  const device = devices?.find((d: any) => d.slug === params?.slug);
+  const selectedVariant = device?.variants?.find((v: any) => v.id === selectedVariantId) || device?.variants?.[0];
 
   const addToCartMutation = useMutation({
     mutationFn: async (variantId: string) => {
@@ -111,7 +98,7 @@ export default function DeviceDetails() {
           <div className="space-y-6">
             <div>
               <Badge variant="outline" className="mb-2">{device.brand}</Badge>
-              <h1 className="text-3xl font-semibold tracking-tight">{deviceDisplayName}</h1>
+              <h1 className="text-3xl font-semibold tracking-tight">{device.marketingName}</h1>
               <p className="text-muted-foreground mt-1">SKU: {device.sku}</p>
             </div>
 
@@ -119,7 +106,11 @@ export default function DeviceDetails() {
         <div>
           <div className="aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden">
             {device.imageUrl ? (
-              <img src={device.imageUrl} alt={deviceDisplayName} className="w-full h-full object-cover" />
+              <img
+                src={device.imageUrl}
+                alt={device.marketingName}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <Package className="h-24 w-24 text-muted-foreground" />
             )}
@@ -215,7 +206,7 @@ export default function DeviceDetails() {
                     </Button>
                     <SaveToListButton
                       deviceVariantId={selectedVariant.id}
-                      deviceName={deviceDisplayName}
+                      deviceName={device.marketingName}
                       variant="outline"
                       size="default"
                     />

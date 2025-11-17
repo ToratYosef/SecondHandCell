@@ -191,9 +191,9 @@ export default function Checkout() {
       <div className="flex min-h-screen flex-col">
         <UnifiedHeader />
         <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="space-y-8">
+              <h1 className="text-3xl font-semibold tracking-tight text-center sm:text-left">Checkout</h1>
               <div className="grid gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-2 space-y-4">
                   {[1, 2, 3].map((i) => (
@@ -230,9 +230,9 @@ export default function Checkout() {
     <div className="flex min-h-screen flex-col">
       <UnifiedHeader />
       <main className="flex-1 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-          <div className="space-y-6">
-            <div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="space-y-8">
+            <div className="text-center sm:text-left">
               <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
               <p className="text-muted-foreground mt-1">Review and complete your order</p>
             </div>

@@ -7,10 +7,9 @@ import { Package, Calendar, DollarSign, Truck } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
-import type { Order } from "@shared/schema";
 
 export default function Orders() {
-  const { data: orders, isLoading } = useQuery<Order[]>({
+  const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/orders"],
   });
 
@@ -19,9 +18,9 @@ export default function Orders() {
       <div className="flex min-h-screen flex-col">
         <UnifiedHeader />
         <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <h1 className="text-3xl font-semibold tracking-tight">My Orders</h1>
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="space-y-8">
+              <h1 className="text-3xl font-semibold tracking-tight text-center sm:text-left">My Orders</h1>
               <div className="space-y-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="h-48 bg-muted rounded-md animate-pulse" />
@@ -35,17 +34,17 @@ export default function Orders() {
     );
   }
 
-  const sortedOrders = [...(orders ?? [])].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const sortedOrders = Array.isArray(orders) ? [...orders].sort((a: any, b: any) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  ) : [];
 
   return (
     <div className="flex min-h-screen flex-col">
       <UnifiedHeader />
       <main className="flex-1 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-          <div className="space-y-6">
-            <div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="space-y-8">
+            <div className="text-center sm:text-left">
               <h1 className="text-3xl font-semibold tracking-tight">My Orders</h1>
               <p className="text-muted-foreground mt-1">View and track your order history</p>
             </div>
@@ -63,7 +62,7 @@ export default function Orders() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {sortedOrders.map((order) => (
+          {sortedOrders.map((order: any) => (
             <Card key={order.id} data-testid={`order-card-${order.orderNumber}`}>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -76,7 +75,7 @@ export default function Orders() {
                       </div>
                       <div className="flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
-                        ${order.total}
+                        ${order.totalAmount}
                       </div>
                     </div>
                   </div>
@@ -95,24 +94,28 @@ export default function Orders() {
                     <StatusBadge status={order.paymentStatus} type="payment" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Order Progress</p>
-                    <StatusBadge status={order.status} type="order" />
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Fulfillment Status</p>
+                    <StatusBadge status={order.fulfillmentStatus} type="order" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">Shipping Address</p>
-                    <p className="text-sm text-muted-foreground">Available on order detail</p>
+                    <p className="text-sm">
+                      {order.shippingAddress?.city}, {order.shippingAddress?.state}
+                    </p>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Tracking</p>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Truck className="h-4 w-4" />
-                      <span>Track this shipment in the detail view</span>
+                  {order.trackingNumber && (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-1">Tracking</p>
+                      <div className="flex items-center gap-1 text-sm">
+                        <Truck className="h-4 w-4" />
+                        <span className="font-mono">{order.trackingNumber}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          ))}
+              ))}
             </div>
           )}
           </div>

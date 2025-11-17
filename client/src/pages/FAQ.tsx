@@ -99,7 +99,7 @@ export default function FAQ() {
       <main className="flex-1">
         {/* Header */}
         <section className="border-b bg-muted/30 py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="mb-4 text-4xl font-bold tracking-tight lg:text-5xl" data-testid="text-faq-headline">
                 Frequently Asked Questions
@@ -113,7 +113,7 @@ export default function FAQ() {
 
         {/* FAQ Content */}
         <section className="py-16 lg:py-24">
-          <div className="container px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl space-y-12">
               {faqCategories.map((category, catIndex) => (
                 <Card key={catIndex} data-testid={`card-faq-category-${catIndex}`}>

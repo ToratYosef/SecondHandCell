@@ -83,10 +83,10 @@ export default function SavedLists() {
     <div className="flex min-h-screen flex-col">
       <UnifiedHeader />
       <main className="flex-1 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-          <div className="space-y-6">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="space-y-8">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
+              <div className="text-center sm:text-left">
                 <h1 className="text-3xl font-semibold tracking-tight">Saved Lists</h1>
                 <p className="text-muted-foreground mt-1">Organize devices for quick ordering</p>
               </div>

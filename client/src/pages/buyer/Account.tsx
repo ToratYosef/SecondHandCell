@@ -38,9 +38,9 @@ export default function Account() {
       <div className="flex min-h-screen flex-col">
         <UnifiedHeader />
         <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <div>
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="space-y-8">
+              <div className="text-center sm:text-left">
                 <h1 className="text-3xl font-bold" data-testid="text-page-title">Account</h1>
                 <p className="text-muted-foreground mt-1" data-testid="text-loading-message">Loading your account information...</p>
               </div>
@@ -57,9 +57,9 @@ export default function Account() {
       <div className="flex min-h-screen flex-col">
         <UnifiedHeader />
         <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <div>
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="space-y-8">
+              <div className="text-center sm:text-left">
                 <h1 className="text-3xl font-bold" data-testid="text-page-title">Account</h1>
                 <p className="text-muted-foreground mt-1" data-testid="text-page-description">Manage your account settings and information</p>
               </div>
@@ -107,8 +107,8 @@ export default function Account() {
       .join(" ");
   };
 
-  const formatDate = (dateValue: string | Date) => {
-    return new Date(dateValue).toLocaleDateString("en-US", {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -119,10 +119,10 @@ export default function Account() {
     <div className="flex min-h-screen flex-col">
       <UnifiedHeader />
       <main className="flex-1 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-          <div className="space-y-6">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="space-y-8">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="text-center sm:text-left">
                 <h1 className="text-3xl font-bold" data-testid="text-page-title">Account</h1>
                 <p className="text-muted-foreground mt-1">Manage your account settings and information</p>
               </div>
@@ -182,7 +182,7 @@ export default function Account() {
               <div className="text-sm font-medium text-muted-foreground">Member Since</div>
               <div className="flex items-center gap-2 mt-1">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span data-testid="text-member-since">{formatDate(profile.createdAt)}</span>
+                <span data-testid="text-member-since">{formatDate(new Date(profile.createdAt).toISOString())}</span>
               </div>
             </div>
           </CardContent>

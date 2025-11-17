@@ -110,15 +110,15 @@ export default function ChangePassword() {
     <div className="flex min-h-screen flex-col">
       <UnifiedHeader />
       <main className="flex-1 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-          <div className="space-y-6">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="space-y-8">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="icon" data-testid="button-back">
                 <Link href="/buyer/account">
                   <ArrowLeft className="h-5 w-5" />
                 </Link>
               </Button>
-              <div>
+              <div className="text-center sm:text-left">
                 <h1 className="text-3xl font-bold" data-testid="text-page-title">Change Password</h1>
                 <p className="text-muted-foreground mt-1">Update your account password securely</p>
               </div>

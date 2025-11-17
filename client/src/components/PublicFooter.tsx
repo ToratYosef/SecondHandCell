@@ -4,17 +4,17 @@ export function PublicFooter() {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = [
-    { href: "/catalog", label: "Catalog" },
+    { href: "/buyer/catalog", label: "Catalog" },
     { href: "/about", label: "About" },
     { href: "/faq", label: "FAQ" },
     { href: "/support", label: "Support" },
-    { href: "/legal/terms", label: "Terms" },
-    { href: "/legal/privacy", label: "Privacy" },
+    { href: "/terms", label: "Terms" },
+    { href: "/privacy", label: "Privacy" },
   ];
 
   return (
     <footer className="border-t bg-muted/30 py-12">
-      <div className="container px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center gap-6">
           {/* Logo */}
           <div className="text-lg font-bold tracking-tight">

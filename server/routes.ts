@@ -5,13 +5,7 @@ import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import Stripe from "stripe";
 import { z } from "zod";
-import {
-  insertUserSchema,
-  insertCompanySchema,
-  insertShippingAddressSchema,
-  insertSavedListSchema,
-  insertSavedListItemSchema,
-} from "@shared/schema";
+import { insertUserSchema, insertCompanySchema, insertShippingAddressSchema } from "@shared/schema";
 
 // Initialize Stripe (only if key is provided)
 let stripe: Stripe | null = null;
@@ -68,11 +62,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }));
-
-  const resolveUserCompanyId = async (userId: string) => {
-    const companyUsers = await storage.getCompanyUsersByUserId(userId);
-    return companyUsers[0]?.companyId ?? null;
-  };
 
   // ==================== PUBLIC API ROUTES (No Auth Required) ====================
   
@@ -564,9 +553,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Fallback: if no tiers exist, use variant's minPrice
+      if (!unitPrice) {
+        const variant = await storage.getDeviceVariant(deviceVariantId);
+        unitPrice = variant?.minPrice;
+      }
+      
       // If still no price, reject the request
       if (!unitPrice) {
-        return res.status(400).json({
+        return res.status(400).json({ 
           error: "Unable to determine price for this item. Please contact support." 
         });
       }
@@ -1236,30 +1231,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all saved lists for user's company
   app.get("/api/saved-lists", requireAuth, async (req, res) => {
     try {
-      const companyId = await resolveUserCompanyId(req.session.userId!);
-      if (!companyId) {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.companyId) {
         return res.status(400).json({ error: "User does not belong to a company" });
       }
-
-      const lists = await storage.getSavedListsByCompanyId(companyId);
+      
+      const lists = await storage.getSavedListsByCompanyId(user.companyId);
       res.json(lists);
     } catch (error: any) {
       console.error("Get saved lists error:", error);
       res.status(500).json({ error: "Failed to get saved lists" });
     }
   });
-
+  
   // Create a new saved list
   app.post("/api/saved-lists", requireAuth, async (req, res) => {
     try {
-      const companyId = await resolveUserCompanyId(req.session.userId!);
-      if (!companyId) {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.companyId) {
         return res.status(400).json({ error: "User does not belong to a company" });
       }
-
+      
       const parsed = insertSavedListSchema.safeParse({
         ...req.body,
-        companyId,
+        companyId: user.companyId,
         createdByUserId: req.session.userId!,
       });
       
@@ -1271,7 +1266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.createAuditLog({
         actorUserId: req.session.userId!,
-        companyId,
+        companyId: user.companyId,
         action: "saved_list_created",
         entityType: "saved_list",
         entityId: list.id,
@@ -1292,10 +1287,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-
+      
       // Verify user has access to this list (same company)
-      const companyId = await resolveUserCompanyId(req.session.userId!);
-      if (!companyId || list.companyId !== companyId) {
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -1314,18 +1309,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-
+      
       // Verify user has access to this list (same company)
-      const companyId = await resolveUserCompanyId(req.session.userId!);
-      if (!companyId || list.companyId !== companyId) {
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
-
+      
       await storage.deleteSavedList(req.params.id);
-
+      
       await storage.createAuditLog({
         actorUserId: req.session.userId!,
-        companyId,
+        companyId: user.companyId!,
         action: "saved_list_deleted",
         entityType: "saved_list",
         entityId: req.params.id,
@@ -1345,10 +1340,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-
+      
       // Verify user has access to this list (same company)
-      const companyId = await resolveUserCompanyId(req.session.userId!);
-      if (!companyId || list.companyId !== companyId) {
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -1376,10 +1371,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-
+      
       // Verify user has access to this list (same company)
-      const companyId = await resolveUserCompanyId(req.session.userId!);
-      if (!companyId || list.companyId !== companyId) {
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
       
