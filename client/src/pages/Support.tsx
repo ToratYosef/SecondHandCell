@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PublicHeader } from "@/components/PublicHeader";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +36,7 @@ export default function Support() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PublicHeader />
+      <UnifiedHeader />
       
       <main className="flex-1">
         {/* Header */}

@@ -5,10 +5,13 @@
 SecondHand(Whole)Cell is a production B2B wholesale buying platform for certified pre-owned electronic devices (smartphones, tablets, laptops, wearables). The platform connects resellers, refurbishers, and dealers with a live inventory catalog, enabling bulk wholesale orders with transparent tiered pricing.
 
 **Key Features:**
+- **Full authentication system**: Login, registration, session management with bcrypt password hashing
 - Live wholesale device catalog with tiered pricing by quantity
 - Multi-role authentication (buyer, admin, super_admin)
 - Complete order management with payment processing
 - Quote request and management system
+- Saved lists feature for buyers to organize and save device selections
+- **Buyer account management**: Profile editing, password changes, account overview
 - Company account approval workflow
 - Inventory and pricing management
 - Stripe payment integration

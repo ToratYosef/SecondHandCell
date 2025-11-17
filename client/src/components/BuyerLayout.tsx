@@ -11,17 +11,20 @@ import {
   User,
   LogOut,
   Menu,
+  FileCheck,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { User as UserType } from "@shared/schema";
 
 const navigation = [
   { name: "Dashboard", href: "/buyer/dashboard", icon: Home },
   { name: "Catalog", href: "/buyer/catalog", icon: Package },
   { name: "Cart", href: "/buyer/cart", icon: ShoppingCart },
   { name: "Orders", href: "/buyer/orders", icon: FileText },
+  { name: "Quotes", href: "/buyer/quotes", icon: FileCheck },
   { name: "Saved Lists", href: "/buyer/saved-lists", icon: Heart },
   { name: "Account", href: "/buyer/account", icon: User },
 ];
@@ -31,13 +34,13 @@ export function BuyerLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: user } = useQuery({
+  const { data: user } = useQuery<Omit<UserType, "passwordHash">>({
     queryKey: ["/api/me"],
   });
 
   const handleLogout = async () => {
     try {
-      await apiRequest("/api/auth/logout", { method: "POST" });
+      await apiRequest("POST", "/api/auth/logout");
       setLocation("/login");
       toast({
         title: "Logged out",
@@ -65,20 +68,21 @@ export function BuyerLayout({ children }: { children: React.ReactNode }) {
         {navigation.map((item) => {
           const isActive = location === item.href || location.startsWith(item.href + "/");
           return (
-            <Link key={item.name} href={item.href}>
-              <Button
-                variant={isActive ? "secondary" : "ghost"}
-                className={cn(
-                  "w-full justify-start",
-                  isActive && "bg-accent"
-                )}
-                data-testid={`nav-${item.name.toLowerCase().replace(" ", "-")}`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
+            <Button
+              key={item.name}
+              asChild
+              variant={isActive ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start",
+                isActive && "bg-accent"
+              )}
+              data-testid={`nav-${item.name.toLowerCase().replace(" ", "-")}`}
+            >
+              <Link href={item.href} onClick={() => setMobileMenuOpen(false)}>
                 <item.icon className="mr-2 h-4 w-4" />
                 {item.name}
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           );
         })}
       </nav>

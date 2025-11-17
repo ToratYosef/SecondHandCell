@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   Menu,
+  FileCheck,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Companies", href: "/admin/companies", icon: Building2 },
   { name: "Inventory", href: "/admin/inventory", icon: Package },
   { name: "Orders", href: "/admin/orders", icon: FileText },
+  { name: "Quotes", href: "/admin/quotes", icon: FileCheck },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -31,13 +33,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: user } = useQuery({
+  const { data: user } = useQuery<{ id: string; name: string; email: string; role: string }>({
     queryKey: ["/api/me"],
   });
 
   const handleLogout = async () => {
     try {
-      await apiRequest("/api/auth/logout", { method: "POST" });
+      await apiRequest("POST", "/api/auth/logout");
       setLocation("/login");
       toast({
         title: "Logged out",

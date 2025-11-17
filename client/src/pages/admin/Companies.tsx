@@ -9,19 +9,26 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StatusBadge } from "@/components/StatusBadge";
 
+interface CompanyWithDetails {
+  id: string;
+  name: string;
+  status: string;
+  contactEmail: string;
+  contactPhone: string;
+  creditLimit: string;
+  createdAt: Date;
+}
+
 export default function Companies() {
   const { toast } = useToast();
   
-  const { data: companies, isLoading } = useQuery({
+  const { data: companies, isLoading } = useQuery<CompanyWithDetails[]>({
     queryKey: ["/api/admin/companies"],
   });
 
   const updateCompanyMutation = useMutation({
     mutationFn: async ({ id, status, creditLimit }: { id: string; status?: string; creditLimit?: string }) => {
-      return await apiRequest(`/api/admin/companies/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status, creditLimit }),
-      });
+      return await apiRequest("PATCH", `/api/admin/companies/${id}`, { status, creditLimit });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });

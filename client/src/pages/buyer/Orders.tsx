@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { Package, Calendar, DollarSign, Truck } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 
 export default function Orders() {
   const { data: orders, isLoading } = useQuery({
@@ -13,13 +15,21 @@ export default function Orders() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-semibold tracking-tight">My Orders</h1>
-        <div className="space-y-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 bg-muted rounded-md animate-pulse" />
-          ))}
-        </div>
+      <div className="flex min-h-screen flex-col">
+        <UnifiedHeader />
+        <main className="flex-1 bg-muted/30">
+          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
+            <div className="space-y-6">
+              <h1 className="text-3xl font-semibold tracking-tight">My Orders</h1>
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-48 bg-muted rounded-md animate-pulse" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </main>
+        <PublicFooter />
       </div>
     );
   }
@@ -29,13 +39,17 @@ export default function Orders() {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">My Orders</h1>
-        <p className="text-muted-foreground mt-1">View and track your order history</p>
-      </div>
+    <div className="flex min-h-screen flex-col">
+      <UnifiedHeader />
+      <main className="flex-1 bg-muted/30">
+        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">My Orders</h1>
+              <p className="text-muted-foreground mt-1">View and track your order history</p>
+            </div>
 
-      {sortedOrders.length === 0 ? (
+            {sortedOrders.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Package className="h-16 w-16 text-muted-foreground mb-4" />
@@ -101,9 +115,13 @@ export default function Orders() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+              ))}
+            </div>
+          )}
+          </div>
         </div>
-      )}
+      </main>
+      <PublicFooter />
     </div>
   );
 }

@@ -3,13 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Package, ShoppingCart, FileText, Heart, TrendingUp, Clock } from "lucide-react";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 
 export default function BuyerDashboard() {
-  const { data: user } = useQuery({ queryKey: ["/api/me"] });
-  const { data: recentOrders, isLoading: ordersLoading } = useQuery({
+  const { data: user } = useQuery<any>({ queryKey: ["/api/me"] });
+  const { data: recentOrders, isLoading: ordersLoading } = useQuery<any>({
     queryKey: ["/api/orders"],
   });
-  const { data: cart } = useQuery({ queryKey: ["/api/cart"] });
+  const { data: cart } = useQuery<any>({ queryKey: ["/api/cart"] });
 
   const stats = [
     {
@@ -39,7 +41,10 @@ export default function BuyerDashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-screen flex-col">
+      <UnifiedHeader />
+      <main className="flex-1 bg-muted/30">
+        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Welcome back, {user?.name}</h1>
         <p className="text-muted-foreground mt-1">Here's what's happening with your account</p>
@@ -145,6 +150,9 @@ export default function BuyerDashboard() {
           </CardContent>
         </Card>
       </div>
+        </div>
+      </main>
+      <PublicFooter />
     </div>
   );
 }

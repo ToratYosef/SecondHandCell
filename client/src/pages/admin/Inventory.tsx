@@ -10,7 +10,7 @@ import { useState } from "react";
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: devices, isLoading } = useQuery({
+  const { data: devices, isLoading } = useQuery<any[]>({
     queryKey: ["/api/catalog"],
   });
 

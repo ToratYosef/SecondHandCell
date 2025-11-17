@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,7 +11,6 @@ import Home from "@/pages/Home";
 import About from "@/pages/About";
 import FAQ from "@/pages/FAQ";
 import Support from "@/pages/Support";
-import Catalog from "@/pages/Catalog";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 
@@ -20,7 +20,6 @@ import Register from "@/pages/Register";
 import RegisterThanks from "@/pages/RegisterThanks";
 
 // Buyer Portal Pages
-import { BuyerLayout } from "@/components/BuyerLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import BuyerDashboard from "@/pages/buyer/Dashboard";
 import BuyerCatalog from "@/pages/buyer/BuyerCatalog";
@@ -28,12 +27,24 @@ import DeviceDetails from "@/pages/buyer/DeviceDetails";
 import Cart from "@/pages/buyer/Cart";
 import Checkout from "@/pages/buyer/Checkout";
 import Orders from "@/pages/buyer/Orders";
+import RequestQuote from "@/pages/buyer/RequestQuote";
+import Quotes from "@/pages/buyer/Quotes";
+import QuoteDetail from "@/pages/buyer/QuoteDetail";
+import SavedLists from "@/pages/buyer/SavedLists";
+import SavedListDetail from "@/pages/buyer/SavedListDetail";
+import Account from "@/pages/buyer/Account";
+import EditProfile from "@/pages/buyer/EditProfile";
+import ChangePassword from "@/pages/buyer/ChangePassword";
 
 // Admin Portal Pages
 import { AdminLayout } from "@/components/AdminLayout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import Companies from "@/pages/admin/Companies";
 import Inventory from "@/pages/admin/Inventory";
+import AdminQuotes from "@/pages/admin/Quotes";
+import AdminOrders from "@/pages/admin/Orders";
+import AdminUsers from "@/pages/admin/Users";
+import AdminSettings from "@/pages/admin/Settings";
 
 function Router() {
   return (
@@ -43,7 +54,6 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/faq" component={FAQ} />
       <Route path="/support" component={Support} />
-      <Route path="/catalog" component={Catalog} />
       
       {/* Legal Pages */}
       <Route path="/legal/terms" component={Terms} />
@@ -58,78 +68,98 @@ function Router() {
       <Route path="/buyer/dashboard">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <BuyerDashboard />
-            </BuyerLayout>
+            <BuyerDashboard />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/buyer/catalog">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <BuyerCatalog />
-            </BuyerLayout>
+            <BuyerCatalog />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/buyer/devices/:slug">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <DeviceDetails />
-            </BuyerLayout>
+            <DeviceDetails />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/buyer/cart">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <Cart />
-            </BuyerLayout>
+            <Cart />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/buyer/checkout">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <Checkout />
-            </BuyerLayout>
+            <Checkout />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/buyer/orders">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <Orders />
-            </BuyerLayout>
+            <Orders />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/buyer/quotes">
+        {() => (
+          <ProtectedRoute requiredRole="buyer">
+            <Quotes />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/buyer/quotes/:id">
+        {() => (
+          <ProtectedRoute requiredRole="buyer">
+            <QuoteDetail />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/buyer/quotes/new">
+        {() => (
+          <ProtectedRoute requiredRole="buyer">
+            <RequestQuote />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/buyer/saved-lists">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <div className="space-y-6">
-                <h1 className="text-3xl font-semibold tracking-tight">Saved Lists</h1>
-                <p className="text-muted-foreground">Manage your saved device lists</p>
-              </div>
-            </BuyerLayout>
+            <SavedLists />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/buyer/saved-lists/:id">
+        {(params) => (
+          <ProtectedRoute requiredRole="buyer">
+            <SavedListDetail params={params} />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/buyer/account">
         {() => (
           <ProtectedRoute requiredRole="buyer">
-            <BuyerLayout>
-              <div className="space-y-6">
-                <h1 className="text-3xl font-semibold tracking-tight">Account Settings</h1>
-                <p className="text-muted-foreground">Manage your account and preferences</p>
-              </div>
-            </BuyerLayout>
+            <Account />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/buyer/account/edit">
+        {() => (
+          <ProtectedRoute requiredRole="buyer">
+            <EditProfile />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/buyer/account/password">
+        {() => (
+          <ProtectedRoute requiredRole="buyer">
+            <ChangePassword />
           </ProtectedRoute>
         )}
       </Route>
@@ -162,14 +192,20 @@ function Router() {
           </ProtectedRoute>
         )}
       </Route>
+      <Route path="/admin/quotes">
+        {() => (
+          <ProtectedRoute requiredRole="admin">
+            <AdminLayout>
+              <AdminQuotes />
+            </AdminLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
       <Route path="/admin/orders">
         {() => (
           <ProtectedRoute requiredRole="admin">
             <AdminLayout>
-              <div className="space-y-6">
-                <h1 className="text-3xl font-semibold tracking-tight">Order Management</h1>
-                <p className="text-muted-foreground">Manage and fulfill customer orders</p>
-              </div>
+              <AdminOrders />
             </AdminLayout>
           </ProtectedRoute>
         )}
@@ -178,10 +214,7 @@ function Router() {
         {() => (
           <ProtectedRoute requiredRole="admin">
             <AdminLayout>
-              <div className="space-y-6">
-                <h1 className="text-3xl font-semibold tracking-tight">User Management</h1>
-                <p className="text-muted-foreground">Manage platform users and permissions</p>
-              </div>
+              <AdminUsers />
             </AdminLayout>
           </ProtectedRoute>
         )}
@@ -190,10 +223,7 @@ function Router() {
         {() => (
           <ProtectedRoute requiredRole="admin">
             <AdminLayout>
-              <div className="space-y-6">
-                <h1 className="text-3xl font-semibold tracking-tight">Admin Settings</h1>
-                <p className="text-muted-foreground">Configure platform settings</p>
-              </div>
+              <AdminSettings />
             </AdminLayout>
           </ProtectedRoute>
         )}
@@ -206,6 +236,17 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const theme = localStorage.getItem("theme");
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

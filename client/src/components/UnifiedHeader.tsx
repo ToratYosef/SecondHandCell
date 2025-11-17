@@ -2,9 +2,31 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 
-export function PublicHeader() {
+export function UnifiedHeader() {
+  // Check auth status without throwing errors for unauthenticated users
+  const { data: user } = useQuery<any>({ 
+    queryKey: ["/api/me"],
+    retry: false,
+    throwOnError: false,
+  });
+  
+  const isAuthenticated = !!user;
+  
+  // Only fetch cart if user is authenticated
+  const { data: cart } = useQuery<any>({ 
+    queryKey: ["/api/cart"],
+    retry: false,
+    throwOnError: false,
+    enabled: isAuthenticated,
+  });
+  
+  const cartItemCount = cart?.items?.length || 0;
+
   const navLinks = [
+    ...(isAuthenticated ? [{ href: "/buyer/catalog", label: "Catalog" }] : []),
     { href: "/about", label: "About" },
     { href: "/faq", label: "FAQ" },
     { href: "/support", label: "Support" },
@@ -38,12 +60,32 @@ export function PublicHeader() {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex md:items-center md:gap-3">
-          <Button variant="ghost" asChild data-testid="button-login">
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button asChild data-testid="button-apply">
-            <Link href="/register">Apply Now</Link>
-          </Button>
+          {isAuthenticated ? (
+            <>
+              <Button variant="ghost" asChild data-testid="button-my-account">
+                <Link href="/buyer/dashboard">My Account</Link>
+              </Button>
+              <Button asChild data-testid="button-catalog">
+                <Link href="/buyer/catalog">
+                  Catalog
+                  {cartItemCount > 0 && (
+                    <Badge variant="secondary" className="ml-2 rounded-full px-2 py-0.5 text-xs">
+                      {cartItemCount}
+                    </Badge>
+                  )}
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" asChild data-testid="button-login">
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button asChild data-testid="button-apply">
+                <Link href="/register">Apply Now</Link>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu */}
@@ -68,12 +110,32 @@ export function PublicHeader() {
                   </Link>
                 ))}
                 <div className="mt-4 flex flex-col gap-2">
-                  <Button variant="outline" asChild data-testid="button-mobile-login">
-                    <Link href="/login">Login</Link>
-                  </Button>
-                  <Button asChild data-testid="button-mobile-apply">
-                    <Link href="/register">Apply Now</Link>
-                  </Button>
+                  {isAuthenticated ? (
+                    <>
+                      <Button variant="outline" asChild data-testid="button-mobile-my-account">
+                        <Link href="/buyer/dashboard">My Account</Link>
+                      </Button>
+                      <Button asChild data-testid="button-mobile-catalog">
+                        <Link href="/buyer/catalog">
+                          Catalog
+                          {cartItemCount > 0 && (
+                            <Badge variant="secondary" className="ml-2 rounded-full px-2 py-0.5 text-xs">
+                              {cartItemCount}
+                            </Badge>
+                          )}
+                        </Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="outline" asChild data-testid="button-mobile-login">
+                        <Link href="/login">Login</Link>
+                      </Button>
+                      <Button asChild data-testid="button-mobile-apply">
+                        <Link href="/register">Apply Now</Link>
+                      </Button>
+                    </>
+                  )}
                 </div>
               </nav>
             </SheetContent>

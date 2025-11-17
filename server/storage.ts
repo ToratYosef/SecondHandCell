@@ -34,6 +34,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   
   // Company methods
   getCompany(id: string): Promise<Company | undefined>;
@@ -48,6 +49,7 @@ export interface IStorage {
   
   // Device Category methods
   getAllCategories(): Promise<DeviceCategory[]>;
+  getCategory(id: string): Promise<DeviceCategory | undefined>;
   createCategory(category: InsertDeviceCategory): Promise<DeviceCategory>;
   
   // Device Model methods
@@ -85,6 +87,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   getOrderByNumber(orderNumber: string): Promise<Order | undefined>;
   getOrdersByCompanyId(companyId: string): Promise<Order[]>;
+  getAllOrders(): Promise<Order[]>;
   updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
   createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
   getOrderItems(orderId: string): Promise<OrderItem[]>;
@@ -158,6 +161,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    const users = await db.select().from(schema.users);
+    return users;
+  }
+
   // Company methods
   async getCompany(id: string): Promise<Company | undefined> {
     const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, id));
@@ -195,6 +203,11 @@ export class DatabaseStorage implements IStorage {
   // Device Category methods
   async getAllCategories(): Promise<DeviceCategory[]> {
     return await db.select().from(schema.deviceCategories);
+  }
+
+  async getCategory(id: string): Promise<DeviceCategory | undefined> {
+    const [category] = await db.select().from(schema.deviceCategories).where(eq(schema.deviceCategories.id, id));
+    return category || undefined;
   }
 
   async createCategory(insertCategory: InsertDeviceCategory): Promise<DeviceCategory> {
@@ -333,6 +346,11 @@ export class DatabaseStorage implements IStorage {
     return order || undefined;
   }
 
+  async getAllOrders(): Promise<Order[]> {
+    const orders = await db.select().from(schema.orders);
+    return orders;
+  }
+
   async createOrderItem(insertItem: InsertOrderItem): Promise<OrderItem> {
     const [item] = await db.insert(schema.orderItems).values(insertItem).returning();
     return item;
@@ -414,6 +432,19 @@ export class DatabaseStorage implements IStorage {
   async addSavedListItem(insertItem: InsertSavedListItem): Promise<SavedListItem> {
     const [item] = await db.insert(schema.savedListItems).values(insertItem).returning();
     return item;
+  }
+
+  async getSavedList(id: string): Promise<SavedList | undefined> {
+    const [list] = await db.select().from(schema.savedLists).where(eq(schema.savedLists.id, id));
+    return list || undefined;
+  }
+
+  async deleteSavedList(id: string): Promise<void> {
+    await db.delete(schema.savedLists).where(eq(schema.savedLists.id, id));
+  }
+
+  async deleteSavedListItem(id: string): Promise<void> {
+    await db.delete(schema.savedListItems).where(eq(schema.savedListItems.id, id));
   }
 
   // Payment methods

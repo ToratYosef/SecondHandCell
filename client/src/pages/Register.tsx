@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { PublicHeader } from "@/components/PublicHeader";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,7 +76,7 @@ export default function Register() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PublicHeader />
+      <UnifiedHeader />
       
       <main className="flex flex-1 items-center justify-center py-16">
         <div className="container px-4 sm:px-6 lg:px-8">

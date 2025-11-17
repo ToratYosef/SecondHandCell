@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { PublicHeader } from "@/components/PublicHeader";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,28 +8,92 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Login() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     remember: false,
   });
 
+  // Get redirect parameter from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const redirectTo = urlParams.get("redirect");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Will be implemented in backend integration
-    toast({
-      title: "Login functionality coming soon",
-      description: "Backend integration in progress",
-    });
+    setIsSubmitting(true);
+
+    try {
+      const res = await apiRequest("POST", "/api/auth/login", {
+        email: formData.email,
+        password: formData.password,
+      });
+
+      const data: {
+        success: boolean;
+        user: {
+          id: string;
+          name: string;
+          email: string;
+          role: string;
+        };
+      } = await res.json();
+
+      // Invalidate any cached user data
+      await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully signed in.",
+      });
+
+      // Redirect to specified page or default based on user role
+      const userRole = data.user.role;
+      if (redirectTo) {
+        setLocation(redirectTo);
+      } else if (userRole === "admin" || userRole === "super_admin") {
+        setLocation("/admin/dashboard");
+      } else {
+        setLocation("/buyer/dashboard");
+      }
+    } catch (error: any) {
+      let errorMessage = "Failed to sign in. Please try again.";
+
+      // Parse error message from apiRequest
+      // Format is "statusCode: {json}" e.g., "401: {"error":"Invalid credentials"}"
+      if (error.message) {
+        try {
+          const parts = error.message.split(": ");
+          if (parts.length > 1) {
+            const jsonPart = parts.slice(1).join(": ");
+            const errorData = JSON.parse(jsonPart);
+            errorMessage = errorData.error || errorMessage;
+          }
+        } catch {
+          // If parsing fails, use the full error message
+          errorMessage = error.message;
+        }
+      }
+
+      toast({
+        variant: "destructive",
+        title: "Sign in failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PublicHeader />
+      <UnifiedHeader />
       
       <main className="flex flex-1 items-center justify-center py-16">
         <div className="container px-4 sm:px-6 lg:px-8">
@@ -91,8 +155,13 @@ export default function Login() {
                   </label>
                 </div>
 
-                <Button type="submit" className="w-full" data-testid="button-login">
-                  Sign In
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  data-testid="button-login"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Signing in..." : "Sign In"}
                 </Button>
 
                 <div className="text-center text-sm">

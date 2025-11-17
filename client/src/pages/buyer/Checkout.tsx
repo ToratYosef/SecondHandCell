@@ -12,8 +12,47 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || "");
+
+interface Cart {
+  items: Array<{
+    id: string;
+    quantity: number;
+    unitPriceSnapshot: string;
+    variant?: {
+      deviceModel?: {
+        name: string;
+        marketingName?: string;
+      };
+    };
+  }>;
+}
+
+interface Company {
+  shippingAddresses: Array<{
+    id: string;
+    contactName: string;
+    street1: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  }>;
+  billingAddresses: Array<{
+    id: string;
+    contactName: string;
+    street1: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  }>;
+}
+
+interface User {
+  companyId: string;
+}
 
 function CheckoutForm({ orderId, amount, onSuccess }: { orderId: string; amount: number; onSuccess: () => void }) {
   const stripe = useStripe();
@@ -44,12 +83,9 @@ function CheckoutForm({ orderId, amount, onSuccess }: { orderId: string; amount:
         });
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         // Confirm payment on backend
-        await apiRequest("/api/confirm-payment", {
-          method: "POST",
-          body: JSON.stringify({
-            orderId,
-            paymentIntentId: paymentIntent.id,
-          }),
+        await apiRequest("POST", "/api/confirm-payment", {
+          orderId,
+          paymentIntentId: paymentIntent.id,
         });
 
         toast({
@@ -95,43 +131,39 @@ export default function Checkout() {
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const { data: cart, isLoading: cartLoading } = useQuery({
+  const { data: cart, isLoading: cartLoading } = useQuery<Cart>({
     queryKey: ["/api/cart"],
   });
 
-  const { data: user } = useQuery({
+  const { data: user } = useQuery<User>({
     queryKey: ["/api/me"],
   });
 
-  const { data: company } = useQuery({
-    queryKey: user ? ["/api/companies", user.companyId] : undefined,
+  const { data: company } = useQuery<Company>({
+    queryKey: ["/api/companies", user?.companyId],
     enabled: !!user?.companyId,
   });
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("/api/orders", {
-        method: "POST",
-        body: JSON.stringify({
-          shippingAddressId: selectedShippingId,
-          billingAddressId: selectedBillingId,
-          paymentMethod,
-          notes,
-        }),
+      const res = await apiRequest("POST", "/api/orders", {
+        shippingAddressId: selectedShippingId,
+        billingAddressId: selectedBillingId,
+        paymentMethod,
+        notes,
       });
+      return await res.json();
     },
     onSuccess: async (order: any) => {
       setCurrentOrderId(order.id);
 
       if (paymentMethod === "card") {
         // Create payment intent for card payments
-        const paymentIntent = await apiRequest("/api/create-payment-intent", {
-          method: "POST",
-          body: JSON.stringify({
-            amount: order.total,
-            orderId: order.id,
-          }),
+        const res = await apiRequest("POST", "/api/create-payment-intent", {
+          amount: order.total,
+          orderId: order.id,
         });
+        const paymentIntent = await res.json();
 
         setClientSecret(paymentIntent.clientSecret);
       } else {
@@ -156,16 +188,24 @@ export default function Checkout() {
 
   if (cartLoading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-64 bg-muted rounded-md animate-pulse" />
-            ))}
+      <div className="flex min-h-screen flex-col">
+        <UnifiedHeader />
+        <main className="flex-1 bg-muted/30">
+          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
+            <div className="space-y-6">
+              <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
+              <div className="grid gap-6 lg:grid-cols-3">
+                <div className="lg:col-span-2 space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-64 bg-muted rounded-md animate-pulse" />
+                  ))}
+                </div>
+                <div className="h-96 bg-muted rounded-md animate-pulse" />
+              </div>
+            </div>
           </div>
-          <div className="h-96 bg-muted rounded-md animate-pulse" />
-        </div>
+        </main>
+        <PublicFooter />
       </div>
     );
   }
@@ -176,7 +216,7 @@ export default function Checkout() {
     return null;
   }
 
-  const subtotal = items.reduce((sum: number, item: any) => {
+  const subtotal = items.reduce((sum: number, item) => {
     return sum + parseFloat(item.unitPriceSnapshot) * item.quantity;
   }, 0);
   const shipping = 25;
@@ -187,13 +227,17 @@ export default function Checkout() {
   const billingAddresses = company?.billingAddresses || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
-        <p className="text-muted-foreground mt-1">Review and complete your order</p>
-      </div>
+    <div className="flex min-h-screen flex-col">
+      <UnifiedHeader />
+      <main className="flex-1 bg-muted/30">
+        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
+              <p className="text-muted-foreground mt-1">Review and complete your order</p>
+            </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
@@ -208,7 +252,7 @@ export default function Checkout() {
                   <SelectValue placeholder="Select shipping address" />
                 </SelectTrigger>
                 <SelectContent>
-                  {shippingAddresses.map((addr: any) => (
+                  {shippingAddresses.map((addr) => (
                     <SelectItem key={addr.id} value={addr.id}>
                       {addr.contactName} - {addr.street1}, {addr.city}, {addr.state} {addr.postalCode}
                     </SelectItem>
@@ -231,7 +275,7 @@ export default function Checkout() {
                   <SelectValue placeholder="Select billing address" />
                 </SelectTrigger>
                 <SelectContent>
-                  {billingAddresses.map((addr: any) => (
+                  {billingAddresses.map((addr) => (
                     <SelectItem key={addr.id} value={addr.id}>
                       {addr.contactName} - {addr.street1}, {addr.city}, {addr.state} {addr.postalCode}
                     </SelectItem>
@@ -325,7 +369,7 @@ export default function Checkout() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                {items.map((item: any) => (
+                {items.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       {item.variant?.deviceModel?.marketingName || item.variant?.deviceModel?.name} x{item.quantity}
@@ -372,8 +416,12 @@ export default function Checkout() {
               )}
             </CardContent>
           </Card>
-        </div>
+            </div>
+          </div>
+            </div>
+          </div>
+        </main>
+        <PublicFooter />
       </div>
-    </div>
-  );
-}
+    );
+  }

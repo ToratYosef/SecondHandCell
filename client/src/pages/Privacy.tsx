@@ -1,10 +1,10 @@
-import { PublicHeader } from "@/components/PublicHeader";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 
 export default function Privacy() {
   return (
     <div className="flex min-h-screen flex-col">
-      <PublicHeader />
+      <UnifiedHeader />
       
       <main className="flex-1">
         <div className="container max-w-4xl px-4 py-16 sm:px-6 lg:px-8">

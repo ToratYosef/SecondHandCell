@@ -1,20 +1,36 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
+import { Menu, ShoppingCart, User } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 
-export function PublicHeader() {
+interface CartResponse {
+  items: Array<{
+    id: string;
+    quantity: number;
+  }>;
+}
+
+export function AuthenticatedHeader() {
   const navLinks = [
+    { href: "/buyer/catalog", label: "Catalog" },
     { href: "/about", label: "About" },
     { href: "/faq", label: "FAQ" },
     { href: "/support", label: "Support" },
   ];
 
+  const { data: cart } = useQuery<CartResponse>({
+    queryKey: ["/api/cart"],
+  });
+
+  const cartItemCount = cart?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
+        <Link href="/buyer/catalog" className="flex items-center space-x-2" data-testid="link-home">
           <div className="text-lg font-bold tracking-tight">
             <span className="text-primary">SecondHand</span>
             <span className="text-muted-foreground">(Whole)</span>
@@ -38,11 +54,22 @@ export function PublicHeader() {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex md:items-center md:gap-3">
-          <Button variant="ghost" asChild data-testid="button-login">
-            <Link href="/login">Login</Link>
+          <Button variant="ghost" asChild data-testid="button-account">
+            <Link href="/buyer/account">
+              <User className="mr-2 h-4 w-4" />
+              My Account
+            </Link>
           </Button>
-          <Button asChild data-testid="button-apply">
-            <Link href="/register">Apply Now</Link>
+          <Button asChild data-testid="button-cart">
+            <Link href="/buyer/cart">
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Cart
+              {cartItemCount > 0 && (
+                <Badge variant="secondary" className="ml-2 no-default-hover-elevate no-default-active-elevate">
+                  {cartItemCount}
+                </Badge>
+              )}
+            </Link>
           </Button>
         </div>
 
@@ -68,11 +95,17 @@ export function PublicHeader() {
                   </Link>
                 ))}
                 <div className="mt-4 flex flex-col gap-2">
-                  <Button variant="outline" asChild data-testid="button-mobile-login">
-                    <Link href="/login">Login</Link>
+                  <Button variant="outline" asChild data-testid="button-mobile-account">
+                    <Link href="/buyer/account">
+                      <User className="mr-2 h-4 w-4" />
+                      My Account
+                    </Link>
                   </Button>
-                  <Button asChild data-testid="button-mobile-apply">
-                    <Link href="/register">Apply Now</Link>
+                  <Button asChild data-testid="button-mobile-cart">
+                    <Link href="/buyer/cart">
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Cart {cartItemCount > 0 && `(${cartItemCount})`}
+                    </Link>
                   </Button>
                 </div>
               </nav>

@@ -63,6 +63,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   }));
 
+  // ==================== PUBLIC API ROUTES (No Auth Required) ====================
+  
+  // Get public categories
+  app.get("/api/public/categories", async (req, res) => {
+    try {
+      const categories = await storage.getAllCategories();
+      res.json(categories);
+    } catch (error: any) {
+      console.error("Get public categories error:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  // Get public catalog (devices without pricing)
+  app.get("/api/public/catalog", async (req, res) => {
+    try {
+      const devices = await storage.getAllDeviceModels();
+      
+      // For public catalog, return device info without pricing details
+      const publicDevices = await Promise.all(
+        devices.map(async (device) => {
+          const variants = await storage.getDeviceVariantsByModelId(device.id);
+          const category = await storage.getCategory(device.categoryId);
+          
+          // Extract unique values (defensive filtering even though schema is .notNull())
+          const conditionValues = variants.map(v => v.conditionGrade).filter(c => c !== null && c !== undefined);
+          const storageValues = variants.map(v => v.storage).filter(s => s !== null && s !== undefined);
+          const colorValues = variants.map(v => v.color).filter(c => c !== null && c !== undefined);
+          
+          return {
+            id: device.id,
+            brand: device.brand,
+            marketingName: device.marketingName,
+            slug: device.slug,
+            categoryId: device.categoryId,
+            categoryName: category?.name || "Unknown",
+            imageUrl: device.imageUrl,
+            description: device.description,
+            variantCount: variants.length,
+            // Don't include pricing for public view
+            availableConditions: Array.from(new Set(conditionValues)),
+            availableStorage: Array.from(new Set(storageValues)),
+            availableColors: Array.from(new Set(colorValues)),
+          };
+        })
+      );
+
+      res.json(publicDevices);
+    } catch (error: any) {
+      console.error("Get public catalog error:", error);
+      res.status(500).json({ error: "Failed to fetch catalog" });
+    }
+  });
+
   // ==================== AUTH ROUTES ====================
   
   // Register new user and company
@@ -234,6 +288,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/me", requireAuth, getMeHandler);
   app.get("/api/me", requireAuth, getMeHandler);
 
+  // ==================== PROFILE ROUTES ====================
+  
+  // Get user profile with company details
+  app.get("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get user's company information
+      const companyUsers = await storage.getCompanyUsersByUserId(user.id);
+      let company = null;
+      let roleInCompany = null;
+
+      if (companyUsers.length > 0) {
+        company = await storage.getCompany(companyUsers[0].companyId);
+        roleInCompany = companyUsers[0].roleInCompany;
+      }
+
+      // Exclude password hash from response
+      const { passwordHash, ...userWithoutPassword } = user;
+
+      res.json({
+        ...userWithoutPassword,
+        company,
+        roleInCompany,
+      });
+    } catch (error: any) {
+      console.error("Get profile error:", error);
+      res.status(500).json({ error: "Failed to get profile" });
+    }
+  });
+
+  // Update user profile
+  app.patch("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const updateSchema = z.object({
+        name: z.string().min(1).optional(),
+        phone: z.string().nullable().optional(),
+      });
+
+      const updates = updateSchema.parse(req.body);
+      const updatedUser = await storage.updateUser(req.session.userId!, updates);
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { passwordHash, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Update profile error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // Change password
+  app.post("/api/profile/password", requireAuth, async (req, res) => {
+    try {
+      const passwordSchema = z.object({
+        currentPassword: z.string().min(1),
+        newPassword: z.string().min(8),
+      });
+
+      const { currentPassword, newPassword } = passwordSchema.parse(req.body);
+
+      // Get user and verify current password
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+
+      // Hash new password and update
+      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(user.id, { passwordHash: newPasswordHash });
+
+      res.json({ success: true, message: "Password updated successfully" });
+    } catch (error: any) {
+      console.error("Change password error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid password data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
   // ==================== CATALOG ROUTES ====================
   
   // Get all device models
@@ -343,7 +492,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items.map(async (item) => {
           const variant = await storage.getDeviceVariant(item.deviceVariantId);
           const model = variant ? await storage.getDeviceModel(variant.deviceModelId) : null;
-          return { ...item, variant, model };
+          
+          return { 
+            ...item, 
+            unitPrice: item.unitPriceSnapshot, // Map to unitPrice for frontend
+            variant: variant ? {
+              ...variant,
+              deviceModel: model
+            } : null
+          };
         })
       );
 
@@ -368,13 +525,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get price tier for quantity
+      // Get price tier for quantity with smart fallback logic
       const priceTiers = await storage.getPriceTiersByVariantId(deviceVariantId);
       const applicableTier = priceTiers.find(
         tier => quantity >= tier.minQuantity && (!tier.maxQuantity || quantity <= tier.maxQuantity)
       );
       
-      const unitPrice = applicableTier?.unitPrice || "0";
+      let unitPrice = applicableTier?.unitPrice;
+      
+      // Fallback logic for mismatched quantities
+      if (!unitPrice && priceTiers.length > 0) {
+        const sortedTiers = [...priceTiers].sort((a, b) => a.minQuantity - b.minQuantity);
+        const lowestTier = sortedTiers[0];
+        const highestTier = sortedTiers[sortedTiers.length - 1];
+        
+        // If quantity is below the lowest tier minimum, use lowest tier price
+        if (quantity < lowestTier.minQuantity) {
+          unitPrice = lowestTier.unitPrice;
+        }
+        // If quantity exceeds the highest tier's minimum, use highest tier price (bulk discount)
+        else if (quantity >= highestTier.minQuantity) {
+          unitPrice = highestTier.unitPrice;
+        }
+        // Quantity is in a gap between tiers, use lowest tier as safe default
+        else {
+          unitPrice = lowestTier.unitPrice;
+        }
+      }
+      
+      // Fallback: if no tiers exist, use variant's minPrice
+      if (!unitPrice) {
+        const variant = await storage.getDeviceVariant(deviceVariantId);
+        unitPrice = variant?.minPrice;
+      }
+      
+      // If still no price, reject the request
+      if (!unitPrice) {
+        return res.status(400).json({ 
+          error: "Unable to determine price for this item. Please contact support." 
+        });
+      }
 
       const item = await storage.addCartItem({
         cartId: cart.id,
@@ -420,6 +610,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { paymentMethod, shippingAddressId, billingAddressId, notes } = req.body;
 
+      // Validate required fields
+      if (!shippingAddressId) {
+        return res.status(400).json({ error: "Shipping address is required" });
+      }
+
+      if (!billingAddressId) {
+        return res.status(400).json({ error: "Billing address is required" });
+      }
+
+      // Validate payment method
+      if (paymentMethod === "card" && !stripe) {
+        return res.status(503).json({ error: "Card payment is not available. Please select another payment method." });
+      }
+
       const cart = await storage.getCartByUserId(req.session.userId!);
       if (!cart) {
         return res.status(400).json({ error: "Cart not found" });
@@ -459,7 +663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentMethod: paymentMethod || "card",
         shippingAddressId: shippingAddressId || null,
         billingAddressId: billingAddressId || null,
-        notes: notes || null,
+        notesCustomer: notes || null,
       });
 
       // Create order items
@@ -529,10 +733,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { amount, orderId } = req.body;
 
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
+
+      // Verify order exists and user has access
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
+      const hasAccess = companyUsers.some((cu) => cu.companyId === order.companyId);
+      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(parseFloat(amount) * 100), // Convert to cents
         currency: "usd",
-        metadata: { orderId },
+        metadata: { 
+          orderId,
+          userId: req.session.userId!,
+          orderNumber: order.orderNumber,
+        },
+      });
+
+      // Store payment intent ID on order for later verification
+      await storage.updateOrder(orderId, {
+        notesInternal: `Stripe Payment Intent: ${paymentIntent.id}`,
       });
 
       res.json({ clientSecret: paymentIntent.client_secret });
@@ -547,13 +776,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orderId, paymentIntentId } = req.body;
 
-      if (!orderId) {
-        return res.status(400).json({ error: "Order ID is required" });
+      if (!orderId || !paymentIntentId) {
+        return res.status(400).json({ error: "Order ID and payment intent ID are required" });
+      }
+
+      if (!stripe) {
+        return res.status(503).json({ error: "Payment processing is not configured" });
       }
 
       const order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Verify user has access to this order
+      const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
+      const hasAccess = companyUsers.some((cu) => cu.companyId === order.companyId);
+      if (!hasAccess && req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Retrieve and validate payment intent from Stripe
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      // Verify payment intent belongs to this order
+      if (paymentIntent.metadata.orderId !== orderId) {
+        return res.status(400).json({ error: "Payment intent does not match order" });
+      }
+
+      // Verify payment succeeded
+      if (paymentIntent.status !== "succeeded") {
+        return res.status(400).json({ error: "Payment has not succeeded" });
+      }
+
+      // Verify amount matches order total (in cents)
+      const orderTotalCents = Math.round(parseFloat(order.total) * 100);
+      if (paymentIntent.amount !== orderTotalCents) {
+        return res.status(400).json({ error: "Payment amount does not match order total" });
       }
 
       // Update order status
@@ -562,25 +821,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: "paid",
       });
 
-      // Record payment if payment intent provided
-      if (paymentIntentId && stripe) {
-        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-        
-        await storage.createPayment({
-          orderId,
-          amount: (paymentIntent.amount / 100).toFixed(2),
-          currency: paymentIntent.currency.toUpperCase(),
-          method: "card",
-          status: "paid",
-          stripePaymentIntentId: paymentIntent.id,
-          processedAt: new Date(),
-        });
-      }
+      // Record payment
+      await storage.createPayment({
+        orderId,
+        amount: (paymentIntent.amount / 100).toFixed(2),
+        currency: paymentIntent.currency.toUpperCase(),
+        method: "card",
+        status: "paid",
+        stripePaymentIntentId: paymentIntent.id,
+        processedAt: new Date(),
+      });
 
       res.json({ success: true, order });
     } catch (error: any) {
       console.error("Confirm payment error:", error);
-      res.status(500).json({ error: "Failed to confirm payment" });
+      res.status(500).json({ error: "Failed to confirm payment: " + error.message });
     }
   });
 
@@ -655,6 +910,479 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Update company error:", error);
       res.status(500).json({ error: "Failed to update company" });
+    }
+  });
+
+  // ==================== QUOTE ROUTES ====================
+  
+  // Create quote
+  app.post("/api/quotes", requireAuth, async (req, res) => {
+    try {
+      const { items, notes, validUntil } = req.body;
+      
+      // Get user's company
+      const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
+      if (companyUsers.length === 0) {
+        return res.status(400).json({ error: "No company found for user" });
+      }
+      const companyId = companyUsers[0].companyId;
+      
+      // Generate quote number
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const quoteNumber = `QT-${timestamp}-${random}`;
+      
+      // Create quote
+      const quote = await storage.createQuote({
+        quoteNumber,
+        companyId,
+        createdByUserId: req.session.userId!,
+        status: "draft",
+        validUntil: validUntil ? new Date(validUntil) : null,
+        subtotal: "0",
+        shippingEstimate: "0",
+        taxEstimate: "0",
+        totalEstimate: "0",
+        currency: "USD",
+      });
+      
+      // Create quote items
+      let subtotal = 0;
+      for (const item of items) {
+        const quoteItem = await storage.createQuoteItem({
+          quoteId: quote.id,
+          deviceVariantId: item.deviceVariantId,
+          quantity: item.quantity,
+          proposedUnitPrice: "0",
+          lineTotalEstimate: "0",
+        });
+      }
+      
+      res.json(quote);
+    } catch (error: any) {
+      console.error("Create quote error:", error);
+      res.status(500).json({ error: "Failed to create quote" });
+    }
+  });
+  
+  // Get quote by ID
+  app.get("/api/quotes/:id", requireAuth, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      
+      // Check authorization
+      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
+        const isMember = companyUsers.some((cu) => cu.companyId === quote.companyId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      
+      const items = await storage.getQuoteItems(quote.id);
+      
+      // Get full details for each quote item
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          const variant = await storage.getDeviceVariant(item.deviceVariantId);
+          const model = variant ? await storage.getDeviceModel(variant.deviceModelId) : null;
+          return { ...item, variant, model };
+        })
+      );
+      
+      res.json({ ...quote, items: itemsWithDetails });
+    } catch (error: any) {
+      console.error("Get quote error:", error);
+      res.status(500).json({ error: "Failed to get quote" });
+    }
+  });
+  
+  // Get quotes for a company
+  app.get("/api/companies/:companyId/quotes", requireAuth, async (req, res) => {
+    try {
+      // Check authorization
+      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
+        const isMember = companyUsers.some((cu) => cu.companyId === req.params.companyId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+      
+      const quotes = await storage.getQuotesByCompanyId(req.params.companyId);
+      res.json(quotes);
+    } catch (error: any) {
+      console.error("Get company quotes error:", error);
+      res.status(500).json({ error: "Failed to get company quotes" });
+    }
+  });
+  
+  // Update quote (admin only for pricing, buyers can update notes)
+  app.patch("/api/quotes/:id", requireAuth, async (req, res) => {
+    try {
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote) {
+        return res.status(404).json({ error: "Quote not found" });
+      }
+      
+      // Buyers can only update their own company's quotes
+      if (req.session.userRole !== "admin" && req.session.userRole !== "super_admin") {
+        const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
+        const isMember = companyUsers.some((cu) => cu.companyId === quote.companyId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        
+        // Buyers can only update status to accepted/rejected
+        const allowedUpdates = ["status"];
+        const updates: any = {};
+        if (req.body.status && ["accepted", "rejected"].includes(req.body.status)) {
+          updates.status = req.body.status;
+        }
+        
+        const updatedQuote = await storage.updateQuote(req.params.id, updates);
+        return res.json(updatedQuote);
+      }
+      
+      // Admins can update anything
+      const updates: any = {};
+      if (req.body.status) updates.status = req.body.status;
+      if (req.body.validUntil) updates.validUntil = new Date(req.body.validUntil);
+      
+      // Validate and parse pricing fields - reject if invalid
+      const validatePricing = (value: any, fieldName: string): string | null => {
+        if (value === undefined || value === null) return null; // Not being updated
+        if (value === "") {
+          return `${fieldName} cannot be empty`;
+        }
+        const parsed = parseFloat(value);
+        if (isNaN(parsed)) {
+          return `${fieldName} must be a valid number`;
+        }
+        if (parsed < 0) {
+          return `${fieldName} cannot be negative`;
+        }
+        return null; // Valid
+      };
+      
+      // Validate all pricing fields if provided
+      const errors: string[] = [];
+      if (req.body.subtotal !== undefined) {
+        const error = validatePricing(req.body.subtotal, "Subtotal");
+        if (error) errors.push(error);
+        else updates.subtotal = parseFloat(req.body.subtotal).toFixed(2);
+      }
+      if (req.body.shippingEstimate !== undefined) {
+        const error = validatePricing(req.body.shippingEstimate, "Shipping estimate");
+        if (error) errors.push(error);
+        else updates.shippingEstimate = parseFloat(req.body.shippingEstimate).toFixed(2);
+      }
+      if (req.body.taxEstimate !== undefined) {
+        const error = validatePricing(req.body.taxEstimate, "Tax estimate");
+        if (error) errors.push(error);
+        else updates.taxEstimate = parseFloat(req.body.taxEstimate).toFixed(2);
+      }
+      if (req.body.totalEstimate !== undefined) {
+        const error = validatePricing(req.body.totalEstimate, "Total estimate");
+        if (error) errors.push(error);
+        else updates.totalEstimate = parseFloat(req.body.totalEstimate).toFixed(2);
+      }
+      
+      if (errors.length > 0) {
+        return res.status(400).json({ error: errors.join(", ") });
+      }
+      
+      // If transitioning to "sent" status, ensure pricing is complete
+      if (updates.status === "sent") {
+        const finalSubtotal = updates.subtotal || quote.subtotal;
+        const finalTotal = updates.totalEstimate || quote.totalEstimate;
+        
+        if (parseFloat(finalTotal) <= 0) {
+          return res.status(400).json({ 
+            error: "Cannot send quote without valid pricing. Total estimate must be greater than 0." 
+          });
+        }
+      }
+      
+      const updatedQuote = await storage.updateQuote(req.params.id, updates);
+      
+      // Log the action
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        companyId: quote.companyId,
+        action: "quote_updated",
+        entityType: "quote",
+        entityId: req.params.id,
+        newValues: JSON.stringify(updates),
+      });
+      
+      res.json(updatedQuote);
+    } catch (error: any) {
+      console.error("Update quote error:", error);
+      res.status(500).json({ error: "Failed to update quote" });
+    }
+  });
+  
+  // Get all quotes (admin only)
+  app.get("/api/admin/quotes", requireAdmin, async (req, res) => {
+    try {
+      // Get all companies and their quotes
+      const companies = await storage.getAllCompanies();
+      const allQuotes = await Promise.all(
+        companies.map(async (company) => {
+          const quotes = await storage.getQuotesByCompanyId(company.id);
+          return quotes.map((quote) => ({ ...quote, company }));
+        })
+      );
+      
+      res.json(allQuotes.flat());
+    } catch (error: any) {
+      console.error("Get all quotes error:", error);
+      res.status(500).json({ error: "Failed to get quotes" });
+    }
+  });
+
+  // Get all orders (admin only)
+  app.get("/api/admin/orders", requireAdmin, async (req, res) => {
+    try {
+      const orders = await storage.getAllOrders();
+      res.json(orders);
+    } catch (error: any) {
+      console.error("Get all orders error:", error);
+      res.status(500).json({ error: "Failed to get orders" });
+    }
+  });
+
+  // Update order status (admin only)
+  app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+    try {
+      const { status } = req.body;
+      const updates: any = {};
+      if (status) updates.status = status;
+
+      const order = await storage.updateOrder(req.params.id, updates);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Log the action
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        action: "order_updated",
+        entityType: "order",
+        entityId: req.params.id,
+        newValues: JSON.stringify(updates),
+      });
+
+      res.json(order);
+    } catch (error: any) {
+      console.error("Update order error:", error);
+      res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+
+  // Get all users (admin only)
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Get all users error:", error);
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  // Update user (admin only)
+  app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { role, isActive } = req.body;
+      const updates: any = {};
+      if (role) updates.role = role;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      const user = await storage.updateUser(req.params.id, updates);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Log the action
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        action: "user_updated",
+        entityType: "user",
+        entityId: req.params.id,
+        newValues: JSON.stringify(updates),
+      });
+
+      res.json(user);
+    } catch (error: any) {
+      console.error("Update user error:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // ====== Saved Lists Routes ======
+  
+  // Get all saved lists for user's company
+  app.get("/api/saved-lists", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.companyId) {
+        return res.status(400).json({ error: "User does not belong to a company" });
+      }
+      
+      const lists = await storage.getSavedListsByCompanyId(user.companyId);
+      res.json(lists);
+    } catch (error: any) {
+      console.error("Get saved lists error:", error);
+      res.status(500).json({ error: "Failed to get saved lists" });
+    }
+  });
+  
+  // Create a new saved list
+  app.post("/api/saved-lists", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.companyId) {
+        return res.status(400).json({ error: "User does not belong to a company" });
+      }
+      
+      const parsed = insertSavedListSchema.safeParse({
+        ...req.body,
+        companyId: user.companyId,
+        createdByUserId: req.session.userId!,
+      });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const list = await storage.createSavedList(parsed.data);
+      
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        companyId: user.companyId,
+        action: "saved_list_created",
+        entityType: "saved_list",
+        entityId: list.id,
+        newValues: JSON.stringify(list),
+      });
+      
+      res.json(list);
+    } catch (error: any) {
+      console.error("Create saved list error:", error);
+      res.status(500).json({ error: "Failed to create saved list" });
+    }
+  });
+  
+  // Get a saved list by ID with items
+  app.get("/api/saved-lists/:id", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      
+      // Verify user has access to this list (same company)
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const items = await storage.getSavedListItems(req.params.id);
+      res.json({ ...list, items });
+    } catch (error: any) {
+      console.error("Get saved list error:", error);
+      res.status(500).json({ error: "Failed to get saved list" });
+    }
+  });
+  
+  // Delete a saved list
+  app.delete("/api/saved-lists/:id", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      
+      // Verify user has access to this list (same company)
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteSavedList(req.params.id);
+      
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        companyId: user.companyId!,
+        action: "saved_list_deleted",
+        entityType: "saved_list",
+        entityId: req.params.id,
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete saved list error:", error);
+      res.status(500).json({ error: "Failed to delete saved list" });
+    }
+  });
+  
+  // Add an item to a saved list
+  app.post("/api/saved-lists/:id/items", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      
+      // Verify user has access to this list (same company)
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const parsed = insertSavedListItemSchema.safeParse({
+        ...req.body,
+        savedListId: req.params.id,
+      });
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const item = await storage.addSavedListItem(parsed.data);
+      res.json(item);
+    } catch (error: any) {
+      console.error("Add saved list item error:", error);
+      res.status(500).json({ error: "Failed to add item to saved list" });
+    }
+  });
+  
+  // Remove an item from a saved list
+  app.delete("/api/saved-lists/:listId/items/:itemId", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getSavedList(req.params.listId);
+      if (!list) {
+        return res.status(404).json({ error: "Saved list not found" });
+      }
+      
+      // Verify user has access to this list (same company)
+      const user = await storage.getUser(req.session.userId!);
+      if (list.companyId !== user?.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteSavedListItem(req.params.itemId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Remove saved list item error:", error);
+      res.status(500).json({ error: "Failed to remove item from saved list" });
     }
   });
 

@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PublicHeader } from "@/components/PublicHeader";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { CheckCircle2, TrendingUp, Truck, Users, Smartphone, Tablet, Laptop, Watch } from "lucide-react";
 import warehouseHero from "@assets/generated_images/Warehouse_hero_background_image_8f8c1570.png";
@@ -80,7 +80,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PublicHeader />
+      <UnifiedHeader />
       
       <main className="flex-1">
         {/* Hero Section */}
@@ -100,7 +100,7 @@ export default function Home() {
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button size="lg" asChild className="bg-primary text-primary-foreground hover-elevate active-elevate-2" data-testid="button-browse-catalog">
-                <Link href="/catalog">Browse Wholesale Catalog</Link>
+                <Link href="/register">Sign Up</Link>
               </Button>
               <Button size="lg" variant="outline" asChild className="border-white/20 bg-white/10 text-white backdrop-blur-sm hover-elevate active-elevate-2" data-testid="button-apply-account">
                 <Link href="/register">Apply for Wholesale Account</Link>

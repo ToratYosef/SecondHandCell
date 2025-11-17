@@ -10,6 +10,9 @@ import { ShoppingCart, Heart, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ConditionBadge } from "@/components/ConditionBadge";
+import { SaveToListButton } from "@/components/SaveToListButton";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 
 export default function DeviceDetails() {
   const [, params] = useRoute("/buyer/devices/:slug");
@@ -25,9 +28,9 @@ export default function DeviceDetails() {
 
   const addToCartMutation = useMutation({
     mutationFn: async (variantId: string) => {
-      return await apiRequest("/api/cart/items", {
-        method: "POST",
-        body: JSON.stringify({ deviceVariantId: variantId, quantity: 1 }),
+      return await apiRequest("POST", "/api/cart/items", {
+        deviceVariantId: variantId,
+        quantity: 1,
       });
     },
     onSuccess: () => {
@@ -48,36 +51,58 @@ export default function DeviceDetails() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-64 bg-muted rounded-md animate-pulse" />
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="h-96 bg-muted rounded-md animate-pulse" />
-          <div className="h-96 bg-muted rounded-md animate-pulse" />
-        </div>
+      <div className="flex min-h-screen flex-col">
+        <UnifiedHeader />
+        <main className="flex-1 bg-muted/30">
+          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
+            <div className="space-y-6">
+              <div className="h-8 w-64 bg-muted rounded-md animate-pulse" />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="h-96 bg-muted rounded-md animate-pulse" />
+                <div className="h-96 bg-muted rounded-md animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </main>
+        <PublicFooter />
       </div>
     );
   }
 
   if (!device) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <h2 className="text-2xl font-semibold mb-2">Device not found</h2>
-          <p className="text-muted-foreground">The device you're looking for doesn't exist</p>
-        </CardContent>
-      </Card>
+      <div className="flex min-h-screen flex-col">
+        <UnifiedHeader />
+        <main className="flex-1 bg-muted/30">
+          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
+            <div className="space-y-6">
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <h2 className="text-2xl font-semibold mb-2">Device not found</h2>
+                  <p className="text-muted-foreground">The device you're looking for doesn't exist</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+        <PublicFooter />
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Badge variant="outline" className="mb-2">{device.brand}</Badge>
-        <h1 className="text-3xl font-semibold tracking-tight">{device.marketingName}</h1>
-        <p className="text-muted-foreground mt-1">SKU: {device.sku}</p>
-      </div>
+    <div className="flex min-h-screen flex-col">
+      <UnifiedHeader />
+      <main className="flex-1 bg-muted/30">
+        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
+          <div className="space-y-6">
+            <div>
+              <Badge variant="outline" className="mb-2">{device.brand}</Badge>
+              <h1 className="text-3xl font-semibold tracking-tight">{device.marketingName}</h1>
+              <p className="text-muted-foreground mt-1">SKU: {device.sku}</p>
+            </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
         <div>
           <div className="aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden">
             {device.imageUrl ? (
@@ -179,9 +204,12 @@ export default function DeviceDetails() {
                       <ShoppingCart className="mr-2 h-4 w-4" />
                       Add to Cart
                     </Button>
-                    <Button variant="outline" size="icon" data-testid="button-save">
-                      <Heart className="h-4 w-4" />
-                    </Button>
+                    <SaveToListButton
+                      deviceVariantId={selectedVariant.id}
+                      deviceName={device.marketingName}
+                      variant="outline"
+                      size="default"
+                    />
                   </div>
                 </div>
               )}
@@ -252,8 +280,12 @@ export default function DeviceDetails() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+          </Tabs>
+          </div>
+        </div>
+      </main>
+      <PublicFooter />
     </div>
   );
 }
