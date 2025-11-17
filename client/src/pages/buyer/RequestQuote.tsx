@@ -11,9 +11,18 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { Plus, X, FileText } from "lucide-react";
-import { ConditionBadge } from "@/components/ConditionBadge";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
+import type { DeviceModel, DeviceVariant, InventoryItem, PriceTier } from "@shared/schema";
+
+type VariantWithDetails = DeviceVariant & {
+  inventory: InventoryItem | null;
+  priceTiers: PriceTier[];
+};
+
+type DeviceModelWithVariants = DeviceModel & {
+  variants: VariantWithDetails[];
+};
 
 interface QuoteItem {
   deviceVariantId: string;
@@ -27,17 +36,17 @@ export default function RequestQuote() {
   const { toast } = useToast();
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [notes, setNotes] = useState("");
-  const [selectedDevice, setSelectedDevice] = useState("");
+  const [selectedDeviceSlug, setSelectedDeviceSlug] = useState("");
   const [selectedVariant, setSelectedVariant] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  const { data: devices, isLoading: devicesLoading } = useQuery({
+  const { data: devices, isLoading: devicesLoading } = useQuery<DeviceModelWithVariants[]>({
     queryKey: ["/api/catalog"],
   });
 
-  const { data: variants } = useQuery({
-    queryKey: ["/api/catalog/models", selectedDevice],
-    enabled: !!selectedDevice,
+  const { data: selectedDeviceDetails } = useQuery<DeviceModelWithVariants | null>({
+    queryKey: ["/api/catalog/models", selectedDeviceSlug],
+    enabled: !!selectedDeviceSlug,
   });
 
   const createQuoteMutation = useMutation({
@@ -77,8 +86,8 @@ export default function RequestQuote() {
       return;
     }
 
-    const device = devices?.find((d: any) => d.id === selectedDevice);
-    const variant = variants?.variants?.find((v: any) => v.id === selectedVariant);
+    const device = devices?.find((d) => d.slug === selectedDeviceSlug);
+    const variant = selectedDeviceDetails?.variants?.find((v) => v.id === selectedVariant);
 
     setItems([...items, {
       deviceVariantId: selectedVariant,
@@ -87,7 +96,7 @@ export default function RequestQuote() {
       variantDetails: `${variant?.storage} | ${variant?.color} | Grade ${variant?.conditionGrade}`,
     }]);
 
-    setSelectedDevice("");
+    setSelectedDeviceSlug("");
     setSelectedVariant("");
     setQuantity(1);
   };
@@ -133,7 +142,7 @@ export default function RequestQuote() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="device">Device</Label>
-              <Select value={selectedDevice} onValueChange={setSelectedDevice}>
+              <Select value={selectedDeviceSlug} onValueChange={setSelectedDeviceSlug}>
                 <SelectTrigger id="device" data-testid="select-device">
                   <SelectValue placeholder="Select a device" />
                 </SelectTrigger>
@@ -141,8 +150,8 @@ export default function RequestQuote() {
                   {devicesLoading ? (
                     <SelectItem value="loading" disabled>Loading...</SelectItem>
                   ) : (
-                    devices?.map((device: any) => (
-                      <SelectItem key={device.id} value={device.id}>
+                    devices?.map((device) => (
+                      <SelectItem key={device.id} value={device.slug}>
                         {device.marketingName || `${device.brand} ${device.name}`}
                       </SelectItem>
                     ))
@@ -151,7 +160,7 @@ export default function RequestQuote() {
               </Select>
             </div>
 
-            {selectedDevice && (
+            {selectedDeviceSlug && (
               <div className="space-y-2">
                 <Label htmlFor="variant">Variant</Label>
                 <Select value={selectedVariant} onValueChange={setSelectedVariant}>
@@ -159,7 +168,7 @@ export default function RequestQuote() {
                     <SelectValue placeholder="Select variant" />
                   </SelectTrigger>
                   <SelectContent>
-                    {variants?.variants?.map((variant: any) => (
+                    {selectedDeviceDetails?.variants?.map((variant) => (
                       <SelectItem key={variant.id} value={variant.id}>
                         {variant.storage} | {variant.color} | Grade {variant.conditionGrade}
                       </SelectItem>
