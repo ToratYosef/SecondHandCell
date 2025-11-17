@@ -33,10 +33,10 @@ export function UnifiedHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 text-center backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex flex-col items-center justify-center gap-4 px-4 py-6 text-center sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
+        <Link href="/" className="flex flex-col items-center space-y-1" data-testid="link-home">
           <div className="text-lg font-bold tracking-tight">
             <span className="text-primary">SecondHand</span>
             <span className="text-muted-foreground">(Whole)</span>
@@ -45,7 +45,7 @@ export function UnifiedHeader() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex md:flex-1 md:items-center md:justify-center md:gap-6">
+        <nav className="hidden w-full flex-wrap items-center justify-center gap-6 md:flex">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -59,7 +59,7 @@ export function UnifiedHeader() {
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden md:flex md:items-center md:gap-3">
+        <div className="hidden w-full flex-wrap items-center justify-center gap-3 md:flex">
           {isAuthenticated ? (
             <>
               <Button variant="ghost" asChild data-testid="button-my-account">
@@ -89,7 +89,7 @@ export function UnifiedHeader() {
         </div>
 
         {/* Mobile Menu */}
-        <div className="flex flex-1 items-center justify-end md:hidden">
+        <div className="flex w-full items-center justify-center md:hidden">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" data-testid="button-menu">
@@ -98,7 +98,7 @@ export function UnifiedHeader() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-              <nav className="flex flex-col gap-4">
+              <nav className="flex flex-col items-center gap-4 text-center">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
@@ -109,7 +109,7 @@ export function UnifiedHeader() {
                     {link.label}
                   </Link>
                 ))}
-                <div className="mt-4 flex flex-col gap-2">
+                <div className="mt-4 flex w-full flex-col items-center gap-2">
                   {isAuthenticated ? (
                     <>
                       <Button variant="outline" asChild data-testid="button-mobile-my-account">
