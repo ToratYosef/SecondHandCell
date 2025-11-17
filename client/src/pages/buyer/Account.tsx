@@ -107,8 +107,8 @@ export default function Account() {
       .join(" ");
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateValue: string | Date) => {
+    return new Date(dateValue).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",

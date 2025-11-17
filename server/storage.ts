@@ -112,6 +112,9 @@ export interface IStorage {
   createSavedList(list: InsertSavedList): Promise<SavedList>;
   getSavedListItems(listId: string): Promise<SavedListItem[]>;
   addSavedListItem(item: InsertSavedListItem): Promise<SavedListItem>;
+  getSavedList(id: string): Promise<SavedList | undefined>;
+  deleteSavedList(id: string): Promise<void>;
+  deleteSavedListItem(id: string): Promise<void>;
   
   // Payment methods
   createPayment(payment: InsertPayment): Promise<Payment>;
