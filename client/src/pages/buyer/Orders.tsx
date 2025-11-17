@@ -7,9 +7,10 @@ import { Package, Calendar, DollarSign, Truck } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
+import type { Order } from "@shared/schema";
 
 export default function Orders() {
-  const { data: orders, isLoading } = useQuery({
+  const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
   });
 
@@ -34,8 +35,8 @@ export default function Orders() {
     );
   }
 
-  const sortedOrders = [...(orders || [])].sort((a: any, b: any) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  const sortedOrders = [...(orders ?? [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
   return (
@@ -62,7 +63,7 @@ export default function Orders() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {sortedOrders.map((order: any) => (
+          {sortedOrders.map((order) => (
             <Card key={order.id} data-testid={`order-card-${order.orderNumber}`}>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -75,7 +76,7 @@ export default function Orders() {
                       </div>
                       <div className="flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
-                        ${order.totalAmount}
+                        ${order.total}
                       </div>
                     </div>
                   </div>
@@ -94,28 +95,24 @@ export default function Orders() {
                     <StatusBadge status={order.paymentStatus} type="payment" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Fulfillment Status</p>
-                    <StatusBadge status={order.fulfillmentStatus} type="fulfillment" />
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Order Progress</p>
+                    <StatusBadge status={order.status} type="order" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">Shipping Address</p>
-                    <p className="text-sm">
-                      {order.shippingAddress?.city}, {order.shippingAddress?.state}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Available on order detail</p>
                   </div>
-                  {order.trackingNumber && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Tracking</p>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Truck className="h-4 w-4" />
-                        <span className="font-mono">{order.trackingNumber}</span>
-                      </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Tracking</p>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Truck className="h-4 w-4" />
+                      <span>Track this shipment in the detail view</span>
                     </div>
-                  )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
-              ))}
+          ))}
             </div>
           )}
           </div>
