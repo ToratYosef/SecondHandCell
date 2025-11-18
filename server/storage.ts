@@ -50,6 +50,7 @@ export interface IStorage {
   // Device Category methods
   getAllCategories(): Promise<DeviceCategory[]>;
   getCategory(id: string): Promise<DeviceCategory | undefined>;
+  getCategoryBySlug(slug: string): Promise<DeviceCategory | undefined>;
   createCategory(category: InsertDeviceCategory): Promise<DeviceCategory>;
   
   // Device Model methods
@@ -207,6 +208,11 @@ export class DatabaseStorage implements IStorage {
 
   async getCategory(id: string): Promise<DeviceCategory | undefined> {
     const [category] = await db.select().from(schema.deviceCategories).where(eq(schema.deviceCategories.id, id));
+    return category || undefined;
+  }
+
+  async getCategoryBySlug(slug: string): Promise<DeviceCategory | undefined> {
+    const [category] = await db.select().from(schema.deviceCategories).where(eq(schema.deviceCategories.slug, slug));
     return category || undefined;
   }
 
