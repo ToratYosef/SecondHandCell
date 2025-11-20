@@ -1,11 +1,19 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import pgSession from "connect-pg-simple";
 import { storage } from "./storage";
+import { pool } from "./db";
 import bcrypt from "bcrypt";
 import Stripe from "stripe";
 import { z } from "zod";
-import { insertUserSchema, insertCompanySchema, insertShippingAddressSchema } from "@shared/schema";
+import {
+  insertUserSchema,
+  insertCompanySchema,
+  insertShippingAddressSchema,
+  insertSavedListSchema,
+  insertSavedListItemSchema,
+} from "@shared/schema";
 
 // Initialize Stripe (only if key is provided)
 let stripe: Stripe | null = null;
@@ -31,6 +39,39 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+// Helper to fetch the first company a user belongs to
+const getUserPrimaryCompany = async (userId: string) => {
+  const companyUsers = await storage.getCompanyUsersByUserId(userId);
+  if (companyUsers.length === 0) {
+    return null;
+  }
+
+  return {
+    companyId: companyUsers[0].companyId,
+    roleInCompany: companyUsers[0].roleInCompany,
+  } as const;
+};
+
+const selectPriceTierForQuantity = (tiers: any[], quantity: number) => {
+  const activeTiers = tiers.filter((tier) => tier.isActive !== false);
+  const sortedTiers = activeTiers.sort((a, b) => a.minQuantity - b.minQuantity);
+
+  const exactMatch = sortedTiers.find((tier) => {
+    const withinMin = quantity >= tier.minQuantity;
+    const withinMax = tier.maxQuantity ? quantity <= tier.maxQuantity : true;
+    return withinMin && withinMax;
+  });
+
+  if (exactMatch) return exactMatch;
+
+  // If no explicit range matched, fall back to the highest eligible min quantity
+  const fallback = [...sortedTiers]
+    .filter((tier) => quantity >= tier.minQuantity)
+    .sort((a, b) => b.minQuantity - a.minQuantity)[0];
+
+  return fallback || null;
+};
+
 // Middleware to check if user is admin or super_admin
 const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.userId) {
@@ -47,18 +88,26 @@ const requireAdmin = async (req: Request, res: Response, next: NextFunction) => 
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure session middleware
-  const sessionSecret = process.env.SESSION_SECRET || 
-    (process.env.NODE_ENV === 'production' 
+  const sessionSecret = process.env.SESSION_SECRET ||
+    (process.env.NODE_ENV === 'production'
       ? (() => { throw new Error('SESSION_SECRET must be set in production'); })()
       : 'dev-secret-only-for-local-development');
-  
+
+  const PgSession = pgSession(session);
+
   app.use(session({
+    store: new PgSession({
+      pool,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }));
@@ -287,6 +336,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/auth/me", requireAuth, getMeHandler);
   app.get("/api/me", requireAuth, getMeHandler);
+
+  // Get the company for the authenticated user
+  app.get("/api/auth/company", requireAuth, async (req, res) => {
+    try {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext) {
+        return res.status(404).json({ error: "User does not belong to a company" });
+      }
+
+      const company = await storage.getCompany(companyContext.companyId);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      res.json({
+        ...company,
+        roleInCompany: companyContext.roleInCompany,
+      });
+    } catch (error: any) {
+      console.error("Get company error:", error);
+      res.status(500).json({ error: "Failed to load company" });
+    }
+  });
 
   // ==================== PROFILE ROUTES ====================
   
@@ -919,45 +991,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quotes", requireAuth, async (req, res) => {
     try {
       const { items, notes, validUntil } = req.body;
-      
+
       // Get user's company
-      const companyUsers = await storage.getCompanyUsersByUserId(req.session.userId!);
-      if (companyUsers.length === 0) {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext) {
         return res.status(400).json({ error: "No company found for user" });
       }
-      const companyId = companyUsers[0].companyId;
+      const companyId = companyContext.companyId;
       
       // Generate quote number
       const timestamp = Date.now().toString(36).toUpperCase();
       const random = Math.random().toString(36).substring(2, 6).toUpperCase();
       const quoteNumber = `QT-${timestamp}-${random}`;
       
-      // Create quote
+      // Determine pricing for each item
+      let subtotal = 0;
+      const preparedItems = [] as { deviceVariantId: string; quantity: number; unitPrice: number; }[];
+
+      for (const item of items) {
+        const tiers = await storage.getPriceTiersByVariantId(item.deviceVariantId);
+        const matchingTier = selectPriceTierForQuantity(tiers, item.quantity);
+
+        if (!matchingTier) {
+          return res.status(400).json({ error: "No pricing available for one or more items" });
+        }
+
+        const unitPrice = parseFloat(matchingTier.unitPrice);
+        if (isNaN(unitPrice)) {
+          return res.status(400).json({ error: "Invalid pricing data for selected item" });
+        }
+
+        preparedItems.push({
+          deviceVariantId: item.deviceVariantId,
+          quantity: item.quantity,
+          unitPrice,
+        });
+
+        subtotal += unitPrice * item.quantity;
+      }
+
+      const shippingEstimate = 0;
+      const taxEstimate = 0;
+      const totalEstimate = subtotal + shippingEstimate + taxEstimate;
+
+      // Create quote with calculated totals
       const quote = await storage.createQuote({
         quoteNumber,
         companyId,
         createdByUserId: req.session.userId!,
         status: "draft",
         validUntil: validUntil ? new Date(validUntil) : null,
-        subtotal: "0",
-        shippingEstimate: "0",
-        taxEstimate: "0",
-        totalEstimate: "0",
+        subtotal: subtotal.toFixed(2),
+        shippingEstimate: shippingEstimate.toFixed(2),
+        taxEstimate: taxEstimate.toFixed(2),
+        totalEstimate: totalEstimate.toFixed(2),
         currency: "USD",
       });
-      
-      // Create quote items
-      let subtotal = 0;
-      for (const item of items) {
-        const quoteItem = await storage.createQuoteItem({
+
+      // Create quote items with pricing
+      for (const item of preparedItems) {
+        await storage.createQuoteItem({
           quoteId: quote.id,
           deviceVariantId: item.deviceVariantId,
           quantity: item.quantity,
-          proposedUnitPrice: "0",
-          lineTotalEstimate: "0",
+          proposedUnitPrice: item.unitPrice.toFixed(2),
+          lineTotalEstimate: (item.unitPrice * item.quantity).toFixed(2),
         });
       }
-      
+
       res.json(quote);
     } catch (error: any) {
       console.error("Create quote error:", error);
@@ -1231,12 +1332,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all saved lists for user's company
   app.get("/api/saved-lists", requireAuth, async (req, res) => {
     try {
-      const user = await storage.getUser(req.session.userId!);
-      if (!user?.companyId) {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext) {
         return res.status(400).json({ error: "User does not belong to a company" });
       }
-      
-      const lists = await storage.getSavedListsByCompanyId(user.companyId);
+
+      const lists = await storage.getSavedListsByCompanyId(companyContext.companyId);
       res.json(lists);
     } catch (error: any) {
       console.error("Get saved lists error:", error);
@@ -1247,14 +1348,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new saved list
   app.post("/api/saved-lists", requireAuth, async (req, res) => {
     try {
-      const user = await storage.getUser(req.session.userId!);
-      if (!user?.companyId) {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext) {
         return res.status(400).json({ error: "User does not belong to a company" });
       }
-      
+
       const parsed = insertSavedListSchema.safeParse({
         ...req.body,
-        companyId: user.companyId,
+        companyId: companyContext.companyId,
         createdByUserId: req.session.userId!,
       });
       
@@ -1263,10 +1364,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const list = await storage.createSavedList(parsed.data);
-      
+
       await storage.createAuditLog({
         actorUserId: req.session.userId!,
-        companyId: user.companyId,
+        companyId: companyContext.companyId,
         action: "saved_list_created",
         entityType: "saved_list",
         entityId: list.id,
@@ -1287,10 +1388,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-      
+
       // Verify user has access to this list (same company)
-      const user = await storage.getUser(req.session.userId!);
-      if (list.companyId !== user?.companyId) {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -1309,18 +1410,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-      
+
       // Verify user has access to this list (same company)
-      const user = await storage.getUser(req.session.userId!);
-      if (list.companyId !== user?.companyId) {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
       
       await storage.deleteSavedList(req.params.id);
-      
+
       await storage.createAuditLog({
         actorUserId: req.session.userId!,
-        companyId: user.companyId!,
+        companyId: companyContext.companyId,
         action: "saved_list_deleted",
         entityType: "saved_list",
         entityId: req.params.id,
@@ -1340,10 +1441,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-      
+
       // Verify user has access to this list (same company)
-      const user = await storage.getUser(req.session.userId!);
-      if (list.companyId !== user?.companyId) {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -1371,10 +1472,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!list) {
         return res.status(404).json({ error: "Saved list not found" });
       }
-      
+
       // Verify user has access to this list (same company)
-      const user = await storage.getUser(req.session.userId!);
-      if (list.companyId !== user?.companyId) {
+      const companyContext = await getUserPrimaryCompany(req.session.userId!);
+      if (!companyContext || list.companyId !== companyContext.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
       
