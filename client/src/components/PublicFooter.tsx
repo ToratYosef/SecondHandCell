@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function PublicFooter() {
   const currentYear = new Date().getFullYear();
@@ -17,11 +18,7 @@ export function PublicFooter() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center gap-6">
           {/* Logo */}
-          <div className="text-lg font-bold tracking-tight">
-            <span className="text-primary">SecondHand</span>
-            <span className="text-muted-foreground">(Whole)</span>
-            <span className="text-primary">Cell</span>
-          </div>
+          <BrandLogo />
 
           {/* Links */}
           <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">

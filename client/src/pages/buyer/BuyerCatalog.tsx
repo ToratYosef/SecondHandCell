@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Smartphone, Search, Loader2, Plus, Minus, ShoppingCart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,9 @@ interface Device {
     color: string;
     conditionGrade: string;
     minPrice: string;
+    inventory?: {
+      quantityAvailable?: number;
+    };
   }>;
 }
 
@@ -47,7 +50,9 @@ export default function BuyerCatalog() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: devices, isLoading: devicesLoading } = useQuery<Device[]>({
     queryKey: ["/api/catalog"],
@@ -56,6 +61,31 @@ export default function BuyerCatalog() {
   const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
+
+  useEffect(() => {
+    if (!devices) return;
+
+    setSelectedVariants((prev) => {
+      const next = { ...prev };
+      devices.forEach((device) => {
+        if (!next[device.id] && device.variants?.[0]) {
+          next[device.id] = device.variants[0].id;
+        }
+      });
+      return next;
+    });
+
+    setQuantities((prev) => {
+      const next = { ...prev };
+      devices.forEach((device) => {
+        const firstVariantId = device.variants?.[0]?.id;
+        if (firstVariantId && next[firstVariantId] === undefined) {
+          next[firstVariantId] = 1;
+        }
+      });
+      return next;
+    });
+  }, [devices]);
 
   const addToCartMutation = useMutation({
     mutationFn: async ({ variantId, quantity }: { variantId: string; quantity: number }) => {
@@ -94,17 +124,28 @@ export default function BuyerCatalog() {
   const brands = Array.from(new Set(devices?.map((d) => d.brand) || [])).sort();
 
   // Quantity management
-  const getQuantity = (deviceId: string) => quantities[deviceId] || 1;
-  
-  const updateQuantity = (deviceId: string, change: number) => {
-    const currentQty = getQuantity(deviceId);
-    const newQty = Math.max(1, currentQty + change);
-    setQuantities(prev => ({ ...prev, [deviceId]: newQty }));
+  const getSelectedVariantId = (device: Device) => selectedVariants[device.id] || device.variants?.[0]?.id || "";
+
+  const getQuantity = (variantId: string) => quantities[variantId] || 1;
+
+  const updateQuantity = (variantId: string, change: number, maxQuantity?: number) => {
+    const currentQty = getQuantity(variantId);
+    const safeMax = maxQuantity ?? Number.MAX_SAFE_INTEGER;
+    const newQty = Math.max(1, Math.min(safeMax, currentQty + change));
+    setQuantities((prev) => ({ ...prev, [variantId]: newQty }));
   };
-  
-  const handleQuantityInput = (deviceId: string, value: string) => {
-    const num = parseInt(value) || 1;
-    setQuantities(prev => ({ ...prev, [deviceId]: Math.max(1, num) }));
+
+  const handleQuantityInput = (variantId: string, value: string, maxQuantity?: number) => {
+    const parsed = parseInt(value, 10);
+    const safeMax = maxQuantity ?? Number.MAX_SAFE_INTEGER;
+    const numericValue = Number.isNaN(parsed) ? 1 : parsed;
+    const safeValue = Math.max(1, Math.min(safeMax, numericValue));
+    setQuantities((prev) => ({ ...prev, [variantId]: safeValue }));
+  };
+
+  const handleVariantSelect = (deviceId: string, variantId: string) => {
+    setSelectedVariants((prev) => ({ ...prev, [deviceId]: variantId }));
+    setQuantities((prev) => ({ ...prev, [variantId]: prev[variantId] ?? 1 }));
   };
 
   return (
@@ -202,135 +243,213 @@ export default function BuyerCatalog() {
             {/* Device Grid */}
             {!devicesLoading && filteredDevices.length > 0 && (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredDevices.map((device) => (
-                  <Card key={device.id} className="hover-elevate" data-testid={`card-device-${device.id}`}>
-                    <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
-                      {device.imageUrl ? (
-                        <img 
-                          src={device.imageUrl} 
-                          alt={`${device.brand} ${device.marketingName}`}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <Smartphone className="h-16 w-16 text-muted-foreground" />
-                      )}
-                    </div>
-                    <CardHeader>
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary">{device.categoryName}</Badge>
-                        {device.variantCount > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {device.variantCount} variant{device.variantCount !== 1 ? 's' : ''}
-                          </Badge>
-                        )}
-                      </div>
-                      <CardTitle className="text-lg">
-                        {device.brand} {device.marketingName}
-                      </CardTitle>
-                      {device.description && (
-                        <CardDescription className="line-clamp-2">
-                          {device.description}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 text-sm">
-                        {device.availableStorage && device.availableStorage.length > 0 && (
-                          <div>
-                            <p className="text-muted-foreground mb-1">Storage:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {device.availableStorage.slice(0, 4).map((storage) => (
-                                <Badge key={storage} variant="outline" className="text-xs">
-                                  {storage}
-                                </Badge>
-                              ))}
-                              {device.availableStorage.length > 4 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{device.availableStorage.length - 4}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {device.availableConditions && device.availableConditions.length > 0 && (
-                          <div>
-                            <p className="text-muted-foreground mb-1">Conditions:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {device.availableConditions.map((condition) => (
-                                <Badge key={condition} variant="outline" className="text-xs">
-                                  Grade {condition}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Quantity Selector */}
-                      <div className="mt-4 flex items-center gap-2">
-                        <span className="text-sm font-medium">Quantity:</span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(device.id, -1)}
-                            data-testid={`button-decrease-${device.id}`}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={getQuantity(device.id)}
-                            onChange={(e) => handleQuantityInput(device.id, e.target.value)}
-                            className="h-8 w-16 text-center"
-                            data-testid={`input-quantity-${device.id}`}
+                {filteredDevices.map((device) => {
+                  const selectedVariantId = getSelectedVariantId(device);
+                  const selectedVariant = device.variants?.find((variant) => variant.id === selectedVariantId);
+                  const maxAvailable = selectedVariant?.inventory?.quantityAvailable;
+                  const quantityValue = selectedVariantId ? getQuantity(selectedVariantId) : 1;
+
+                  const goToDetails = () => setLocation(`/buyer/devices/${device.slug}`);
+
+                  return (
+                    <Card
+                      key={device.id}
+                      className="hover-elevate cursor-pointer"
+                      data-testid={`card-device-${device.id}`}
+                      onClick={goToDetails}
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          goToDetails();
+                        }
+                      }}
+                    >
+                      <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+                        {device.imageUrl ? (
+                          <img
+                            src={device.imageUrl}
+                            alt={`${device.brand} ${device.marketingName}`}
+                            className="h-full w-full object-cover"
                           />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(device.id, 1)}
-                            data-testid={`button-increase-${device.id}`}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        ) : (
+                          <Smartphone className="h-16 w-16 text-muted-foreground" />
+                        )}
                       </div>
-                      
-                      <div className="mt-3 flex gap-2">
-                        <Button variant="outline" className="flex-1" asChild data-testid={`button-view-${device.id}`}>
-                          <Link href={`/buyer/devices/${device.slug}`}>View Details</Link>
-                        </Button>
-                        {device.variants?.[0] && (
-                          <>
-                            <SaveToListButton
-                              deviceVariantId={device.variants[0].id}
-                              deviceName={device.marketingName}
+                      <CardHeader>
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">{device.categoryName}</Badge>
+                          {device.variantCount > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {device.variantCount} variant{device.variantCount !== 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                        </div>
+                        <CardTitle className="text-lg">
+                          {device.brand} {device.marketingName}
+                        </CardTitle>
+                        {device.description && (
+                          <CardDescription className="line-clamp-2">
+                            {device.description}
+                          </CardDescription>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3 text-sm">
+                          {device.availableStorage && device.availableStorage.length > 0 && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">Storage:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {device.availableStorage.slice(0, 4).map((storage) => (
+                                  <Badge key={storage} variant="outline" className="text-xs">
+                                    {storage}
+                                  </Badge>
+                                ))}
+                                {device.availableStorage.length > 4 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{device.availableStorage.length - 4}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {device.availableConditions && device.availableConditions.length > 0 && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">Conditions:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {device.availableConditions.map((condition) => (
+                                  <Badge key={condition} variant="outline" className="text-xs">
+                                    Grade {condition}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {device.variants && device.variants.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            <p className="text-sm font-medium text-muted-foreground">Variant</p>
+                            <Select
+                              value={selectedVariantId}
+                              onValueChange={(value) => handleVariantSelect(device.id, value)}
+                              disabled={!selectedVariantId}
+                            >
+                              <SelectTrigger
+                                onClick={(event) => event.stopPropagation()}
+                                data-testid={`select-variant-${device.id}`}
+                              >
+                                <SelectValue placeholder="Choose a variant" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {device.variants.map((variant) => (
+                                  <SelectItem key={variant.id} value={variant.id}>
+                                    {variant.storage} • {variant.color} • Grade {variant.conditionGrade}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {/* Quantity Selector */}
+                        <div className="mt-4 flex items-center gap-2">
+                          <span className="text-sm font-medium">Quantity:</span>
+                          <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                            <Button
                               variant="outline"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (selectedVariantId) {
+                                  updateQuantity(selectedVariantId, -1);
+                                }
+                              }}
+                              disabled={!selectedVariantId}
+                              data-testid={`button-decrease-${device.id}`}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={quantityValue}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(e) => {
+                                if (selectedVariantId) {
+                                  handleQuantityInput(selectedVariantId, e.target.value, maxAvailable);
+                                }
+                              }}
+                              className="h-8 w-16 text-center"
+                              disabled={!selectedVariantId}
+                              data-testid={`input-quantity-${device.id}`}
                             />
                             <Button
-                              onClick={() => addToCartMutation.mutate({ 
-                                variantId: device.variants![0].id, 
-                                quantity: getQuantity(device.id) 
-                              })}
-                              disabled={addToCartMutation.isPending}
-                              data-testid={`button-add-cart-${device.id}`}
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (selectedVariantId) {
+                                  updateQuantity(selectedVariantId, 1, maxAvailable);
+                                }
+                              }}
+                              disabled={!selectedVariantId}
+                              data-testid={`button-increase-${device.id}`}
                             >
-                              {addToCartMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <ShoppingCart className="h-4 w-4" />
-                              )}
+                              <Plus className="h-3 w-3" />
                             </Button>
-                          </>
+                          </div>
+                        </div>
+                        {maxAvailable && (
+                          <p className="mt-2 text-xs text-muted-foreground">{maxAvailable} units available</p>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        <div className="mt-3 flex gap-2" onClick={(event) => event.stopPropagation()}>
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              goToDetails();
+                            }}
+                            data-testid={`button-view-${device.id}`}
+                          >
+                            View Details
+                          </Button>
+                          {selectedVariantId && (
+                            <>
+                              <SaveToListButton
+                                deviceVariantId={selectedVariantId}
+                                deviceName={device.marketingName}
+                                variant="outline"
+                                size="sm"
+                              />
+                              <Button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  addToCartMutation.mutate({
+                                    variantId: selectedVariantId,
+                                    quantity: quantityValue,
+                                  });
+                                }}
+                                disabled={addToCartMutation.isPending}
+                                data-testid={`button-add-cart-${device.id}`}
+                              >
+                                {addToCartMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <ShoppingCart className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
 

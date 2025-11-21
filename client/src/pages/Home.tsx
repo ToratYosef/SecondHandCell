@@ -9,8 +9,17 @@ import smartphonesImg from "@assets/generated_images/Smartphones_category_showca
 import tabletsImg from "@assets/generated_images/Tablets_category_showcase_f9fdb22c.png";
 import laptopsImg from "@assets/generated_images/Laptops_category_showcase_198d90c9.png";
 import smartwatchesImg from "@assets/generated_images/Smartwatches_category_showcase_a9319cde.png";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Home() {
+  const { data: user } = useQuery({
+    queryKey: ["/api/me"],
+    retry: false,
+    throwOnError: false,
+  });
+
+  const isAuthenticated = Boolean(user);
+
   const categories = [
     { name: "Smartphones", slug: "smartphones", icon: Smartphone, image: smartphonesImg },
     { name: "Tablets", slug: "tablets", icon: Tablet, image: tabletsImg },
@@ -100,10 +109,14 @@ export default function Home() {
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button size="lg" asChild className="bg-primary text-primary-foreground hover-elevate active-elevate-2" data-testid="button-browse-catalog">
-                <Link href="/register">Sign Up</Link>
+                <Link href={isAuthenticated ? "/buyer/catalog" : "/login"}>
+                  {isAuthenticated ? "See Catalog" : "Sign In"}
+                </Link>
               </Button>
               <Button size="lg" variant="outline" asChild className="border-white/20 bg-white/10 text-white backdrop-blur-sm hover-elevate active-elevate-2" data-testid="button-apply-account">
-                <Link href="/register">Apply for Wholesale Account</Link>
+                <Link href={isAuthenticated ? "/buyer/dashboard" : "/register"}>
+                  {isAuthenticated ? "Go to Dashboard" : "Apply for Wholesale Account"}
+                </Link>
               </Button>
             </div>
             

@@ -18,6 +18,7 @@ import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { User as UserType } from "@shared/schema";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const navigation = [
   { name: "Dashboard", href: "/buyer/dashboard", icon: Home },
@@ -58,7 +59,7 @@ export function BuyerLayout({ children }: { children: React.ReactNode }) {
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       <div className="p-6 border-b">
-        <h2 className="text-xl font-semibold">SecondHand(Whole)Cell</h2>
+        <BrandLogo imageClassName="h-8" />
         {user && (
           <p className="text-sm text-muted-foreground mt-1">{user.name}</p>
         )}

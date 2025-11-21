@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function PublicHeader() {
   const navLinks = [
@@ -15,11 +16,7 @@ export function PublicHeader() {
       <div className="container flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
-          <div className="text-lg font-bold tracking-tight">
-            <span className="text-primary">SecondHand</span>
-            <span className="text-muted-foreground">(Whole)</span>
-            <span className="text-primary">Cell</span>
-          </div>
+          <BrandLogo />
         </Link>
 
         {/* Desktop Navigation */}
