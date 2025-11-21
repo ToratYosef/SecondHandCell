@@ -17,11 +17,15 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importPayload, setImportPayload] = useState("[
-{
-  \"brand\": \"Apple\",\n  \"name\": \"iPhone 13\",\n  \"marketingName\": \"iPhone 13\",\n  \"sku\": \"IPH13-BASE\",\n  \"variants\": [{ \"storage\": \"128GB\", \"color\": \"Black\", \"conditionGrade\": \"A\", \"networkLockStatus\": \"unlocked\", \"unitPrice\": 499.99, \"quantity\": 10 }]
-}
-]");
+  const [importPayload, setImportPayload] = useState(`[
+  {
+    "brand": "Apple",
+    "name": "iPhone 13",
+    "marketingName": "iPhone 13",
+    "sku": "IPH13-BASE",
+    "variants": [{ "storage": "128GB", "color": "Black", "conditionGrade": "A", "networkLockStatus": "unlocked", "unitPrice": 499.99, "quantity": 10 }]
+  }
+]`);
   const [form, setForm] = useState({
     brand: "",
     name: "",
