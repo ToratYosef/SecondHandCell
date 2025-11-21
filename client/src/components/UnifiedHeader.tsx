@@ -4,6 +4,7 @@ import { Menu, ShoppingCart } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function UnifiedHeader() {
   // Check auth status without throwing errors for unauthenticated users
@@ -38,11 +39,7 @@ export function UnifiedHeader() {
         <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
-            <div className="text-lg font-bold tracking-tight">
-              <span className="text-primary">SecondHand</span>
-              <span className="text-muted-foreground">(Whole)</span>
-              <span className="text-primary">Cell</span>
-            </div>
+            <BrandLogo />
           </Link>
 
           {/* Desktop Navigation - Centered */}

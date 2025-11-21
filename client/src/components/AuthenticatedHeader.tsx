@@ -4,6 +4,7 @@ import { Menu, ShoppingCart, User } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { BrandLogo } from "@/components/BrandLogo";
 
 interface CartResponse {
   items: Array<{
@@ -31,11 +32,7 @@ export function AuthenticatedHeader() {
       <div className="container flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/buyer/catalog" className="flex items-center space-x-2" data-testid="link-home">
-          <div className="text-lg font-bold tracking-tight">
-            <span className="text-primary">SecondHand</span>
-            <span className="text-muted-foreground">(Whole)</span>
-            <span className="text-primary">Cell</span>
-          </div>
+          <BrandLogo />
         </Link>
 
         {/* Desktop Navigation */}

@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun, Upload, Save } from "lucide-react";
+import { Moon, Sun, Save } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { notifyLogoChange } from "@/hooks/useCompanyBranding";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -22,8 +23,6 @@ export default function Settings() {
     }
     return "";
   });
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-
   const handleToggleDarkMode = (checked: boolean) => {
     setDarkMode(checked);
     if (checked) {
@@ -42,7 +41,6 @@ export default function Settings() {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setLogoFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
         setLogoUrl(e.target?.result as string);
@@ -54,6 +52,7 @@ export default function Settings() {
   const handleSaveLogo = () => {
     if (logoUrl) {
       localStorage.setItem("companyLogo", logoUrl);
+      notifyLogoChange();
       toast({
         title: "Logo saved",
         description: "Company logo has been updated successfully",
@@ -103,6 +102,21 @@ export default function Settings() {
             <CardDescription>Upload and manage your company logo</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="logo-url">Logo URL</Label>
+              <Input
+                id="logo-url"
+                type="url"
+                placeholder="https://your-cdn.com/logo.png"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                data-testid="input-logo-url"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste a direct image URL or upload a file below to update the sitewide logo.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="logo-upload">Company Logo</Label>
               <div className="flex items-center gap-4">
