@@ -1,12 +1,10 @@
-import { defineConfig } from "drizzle-kit";
+import type { Config } from "drizzle-kit";
 
-const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
-
-export default defineConfig({
-  out: "./migrations",
+export default {
   schema: "./shared/schema.ts",
+  out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: databaseUrl,
+    url: "file:./dev.db",
   },
-});
+} satisfies Config;
