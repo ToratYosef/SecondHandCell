@@ -246,9 +246,9 @@ export default function Inventory() {
       variant.storage.toLowerCase().includes(searchLower) ||
       variant.color.toLowerCase().includes(searchLower);
 
-    const matchesBrand = !filters.brand || variant.device.brand === filters.brand;
-    const matchesColor = !filters.color || variant.color === filters.color;
-    const matchesCondition = !filters.condition || variant.conditionGrade === filters.condition;
+      const matchesBrand = filters.brand === "all" || !filters.brand || variant.device.brand === filters.brand;
+      const matchesColor = filters.color === "all" || !filters.color || variant.color === filters.color;
+      const matchesCondition = filters.condition === "all" || !filters.condition || variant.conditionGrade === filters.condition;
     const quantity = variant.inventory?.quantityAvailable ?? 0;
     const matchesStock =
       filters.stock === "all" ||
@@ -331,7 +331,7 @@ export default function Inventory() {
                   <SelectValue placeholder="Brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Brands</SelectItem>
+                  <SelectItem value="all">All Brands</SelectItem>
                   {brandOptions.map((brand) => (
                     <SelectItem key={brand} value={brand}>
                       {brand}
@@ -345,7 +345,7 @@ export default function Inventory() {
                   <SelectValue placeholder="Color" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Colors</SelectItem>
+                  <SelectItem value="all">All Colors</SelectItem>
                   {colorOptions.map((color) => (
                     <SelectItem key={color} value={color}>
                       {color}
@@ -359,7 +359,7 @@ export default function Inventory() {
                   <SelectValue placeholder="Condition" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Conditions</SelectItem>
+                  <SelectItem value="all">All Conditions</SelectItem>
                   {conditionOptions.map((condition) => (
                     <SelectItem key={condition} value={condition}>
                       Grade {condition}
