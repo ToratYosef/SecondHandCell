@@ -30,6 +30,7 @@ export default function Inventory() {
     brand: "",
     name: "",
     marketingName: "",
+    imageUrl: "",
     sku: "",
     categorySlug: "",
     storage: "64GB",
@@ -57,6 +58,7 @@ export default function Inventory() {
         brand: form.brand,
         name: form.name,
         marketingName: form.marketingName || form.name,
+        imageUrl: form.imageUrl || undefined,
         sku: form.sku,
         categorySlug: form.categorySlug || undefined,
         variant: {
@@ -263,6 +265,15 @@ export default function Inventory() {
               <div className="space-y-2">
                 <Label>Marketing Name</Label>
                 <Input value={form.marketingName} onChange={(e) => setForm({ ...form, marketingName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Image URL</Label>
+                <Input
+                  type="url"
+                  placeholder="https://example.com/device.jpg"
+                  value={form.imageUrl}
+                  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>SKU</Label>
