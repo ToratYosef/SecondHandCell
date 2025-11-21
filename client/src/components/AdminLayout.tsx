@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: user } = useQuery<{ id: string; name: string; email: string; role: string }>({
     queryKey: ["/api/me"],
@@ -40,6 +41,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout");
+      queryClient.clear();
       setLocation("/login");
       toast({
         title: "Logged out",
