@@ -14,7 +14,7 @@ import {
   insertSavedListSchema,
   insertSavedListItemSchema,
 } from "@shared/schema";
-import { db } from "./db";
+import { db, sqlite } from "./db";
 import * as schema from "@shared/schema";
 
 const slugify = (value: string) =>
@@ -1602,46 +1602,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalOrders = (await db.select().from(schema.orders)).length;
       res.setHeader("X-Total-Rows", String(totalOrders));
 
-      // Stream in pages
-      let offset = 0;
-      while (true) {
-        const batch = await db.select().from(schema.orders).limit(pageSize).offset(offset);
-        if (!batch || batch.length === 0) break;
+      // Use sqlite prepared statement iterate() for efficient cursor-like streaming
+      const stmt = sqlite.prepare(`SELECT * FROM orders ORDER BY created_at ASC`);
+      for (const order of stmt.iterate()) {
+        const items = await storage.getOrderItems(order.id);
+        const company = await storage.getCompany(order.companyId);
 
-        for (const order of batch) {
-          const items = await storage.getOrderItems(order.id);
-          const company = await storage.getCompany(order.companyId);
-
-          let shippingState = "";
-          let shippingCity = "";
-          if (order.shippingAddressId) {
-            const [addr] = await db.select().from(schema.shippingAddresses).where(schema.shippingAddresses.id.equals(order.shippingAddressId));
-            if (addr) {
-              shippingState = addr.state || "";
-              shippingCity = addr.city || "";
-            }
+        let shippingState = "";
+        let shippingCity = "";
+        if (order.shipping_address_id) {
+          const addrStmt = sqlite.prepare(`SELECT * FROM shipping_addresses WHERE id = ?`);
+          const addr = addrStmt.get(order.shipping_address_id);
+          if (addr) {
+            shippingState = addr.state || "";
+            shippingCity = addr.city || "";
           }
-
-          const itemsSummary = items.map(i => `${i.quantity}x ${i.deviceVariantId} @ ${i.unitPrice}`).join("; ");
-
-          const row = [
-            csvEscape(order.orderNumber),
-            csvEscape(company?.name || ""),
-            csvEscape(order.companyId),
-            csvEscape(order.status),
-            csvEscape(order.paymentStatus),
-            csvEscape(order.total),
-            csvEscape(order.currency),
-            csvEscape(new Date(order.createdAt).toISOString()),
-            csvEscape(shippingState),
-            csvEscape(shippingCity),
-            csvEscape(itemsSummary),
-          ];
-
-          res.write(row.join(",") + "\n");
         }
 
-        offset += batch.length;
+        const itemsSummary = items.map(i => `${i.quantity}x ${i.deviceVariantId} @ ${i.unitPrice}`).join("; ");
+
+        const row = [
+          csvEscape(order.order_number || order.orderNumber),
+          csvEscape(company?.name || ""),
+          csvEscape(order.company_id || order.companyId),
+          csvEscape(order.status),
+          csvEscape(order.payment_status || order.paymentStatus),
+          csvEscape(order.total),
+          csvEscape(order.currency),
+          csvEscape(new Date(order.created_at || order.createdAt).toISOString()),
+          csvEscape(shippingState),
+          csvEscape(shippingCity),
+          csvEscape(itemsSummary),
+        ];
+
+        res.write(row.join(",") + "\n");
       }
 
       res.end();
@@ -1685,10 +1679,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Stream models + variants in pages (paginate over device_models and their variants)
       // We'll paginate over device_models and pull variants per model to keep memory bounded.
-      const models = await db.select().from(schema.deviceModels);
-      for (const model of models) {
-        const variants = await db.select().from(schema.deviceVariants).where(schema.deviceVariants.deviceModelId.equals(model.id));
-        for (const variant of variants) {
+      // Stream models and variants using sqlite iterator to avoid loading everything in memory
+      const modelStmt = sqlite.prepare(`SELECT * FROM device_models ORDER BY created_at ASC`);
+      for (const model of modelStmt.iterate()) {
+        const variantStmt = sqlite.prepare(`SELECT * FROM device_variants WHERE device_model_id = ?`);
+        for (const variant of variantStmt.iterate(model.id)) {
           const inventory = await storage.getInventoryByVariantId(variant.id);
           const tiers = await storage.getPriceTiersByVariantId(variant.id);
           const unitPrice = tiers && tiers.length > 0 ? tiers[0].unitPrice : "";
@@ -1700,7 +1695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             csvEscape(variant.id),
             csvEscape(variant.storage),
             csvEscape(variant.color),
-            csvEscape(variant.conditionGrade),
+            csvEscape(variant.condition_grade || variant.conditionGrade),
             csvEscape(inventory?.quantityAvailable ?? 0),
             csvEscape(inventory?.minOrderQuantity ?? 1),
             csvEscape(unitPrice),

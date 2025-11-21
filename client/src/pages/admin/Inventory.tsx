@@ -272,6 +272,25 @@ export default function Inventory() {
     setDeletingVariant(null);
   };
 
+  const exportInventory = async () => {
+    try {
+      // reuse the admin export endpoint
+      const res = await fetch('/api/admin/export/inventory.csv?pageSize=500');
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inventory-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: 'Error', description: 'Failed to export inventory', variant: 'destructive' });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -298,6 +317,10 @@ export default function Inventory() {
           <Button onClick={() => setAddDialogOpen(true)} data-testid="button-add-inventory">
             <Package className="mr-2 h-4 w-4" />
             Add Device
+          </Button>
+          <Button onClick={exportInventory} data-testid="button-export-inventory" variant="outline">
+            <FileText className="mr-2 h-4 w-4" />
+            Export Inventory CSV
           </Button>
         </div>
       </div>
