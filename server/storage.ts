@@ -64,16 +64,20 @@ export interface IStorage {
   getDeviceVariantsByModelId(modelId: string): Promise<DeviceVariant[]>;
   createDeviceVariant(variant: InsertDeviceVariant): Promise<DeviceVariant>;
   updateDeviceVariant(id: string, updates: Partial<DeviceVariant>): Promise<DeviceVariant | undefined>;
+  deleteDeviceVariant(id: string): Promise<void>;
   
   // Inventory methods
   getInventoryByVariantId(variantId: string): Promise<InventoryItem | undefined>;
   createInventory(inventory: InsertInventoryItem): Promise<InventoryItem>;
   updateInventory(id: string, updates: Partial<InventoryItem>): Promise<InventoryItem | undefined>;
-  
+  deleteInventoryByVariantId(variantId: string): Promise<void>;
+
   // Price Tier methods
   getPriceTiersByVariantId(variantId: string): Promise<PriceTier[]>;
   createPriceTier(tier: InsertPriceTier): Promise<PriceTier>;
-  
+  updatePriceTier(id: string, updates: Partial<PriceTier>): Promise<PriceTier | undefined>;
+  deletePriceTiersByVariantId(variantId: string): Promise<void>;
+
   // Cart methods
   getCartByUserId(userId: string): Promise<Cart | undefined>;
   createCart(cart: InsertCart): Promise<Cart>;
@@ -261,6 +265,10 @@ export class DatabaseStorage implements IStorage {
     return variant || undefined;
   }
 
+  async deleteDeviceVariant(id: string): Promise<void> {
+    await db.delete(schema.deviceVariants).where(eq(schema.deviceVariants.id, id));
+  }
+
   // Inventory methods
   async getInventoryByVariantId(variantId: string): Promise<InventoryItem | undefined> {
     const [item] = await db.select().from(schema.inventoryItems).where(eq(schema.inventoryItems.deviceVariantId, variantId));
@@ -277,6 +285,10 @@ export class DatabaseStorage implements IStorage {
     return item || undefined;
   }
 
+  async deleteInventoryByVariantId(variantId: string): Promise<void> {
+    await db.delete(schema.inventoryItems).where(eq(schema.inventoryItems.deviceVariantId, variantId));
+  }
+
   // Price Tier methods
   async getPriceTiersByVariantId(variantId: string): Promise<PriceTier[]> {
     return await db.select().from(schema.priceTiers)
@@ -290,6 +302,15 @@ export class DatabaseStorage implements IStorage {
   async createPriceTier(insertTier: InsertPriceTier): Promise<PriceTier> {
     const [tier] = await db.insert(schema.priceTiers).values(insertTier).returning();
     return tier;
+  }
+
+  async updatePriceTier(id: string, updates: Partial<PriceTier>): Promise<PriceTier | undefined> {
+    const [tier] = await db.update(schema.priceTiers).set(updates).where(eq(schema.priceTiers.id, id)).returning();
+    return tier || undefined;
+  }
+
+  async deletePriceTiersByVariantId(variantId: string): Promise<void> {
+    await db.delete(schema.priceTiers).where(eq(schema.priceTiers.deviceVariantId, variantId));
   }
 
   // Cart methods

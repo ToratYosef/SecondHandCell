@@ -16,6 +16,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -55,12 +56,47 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Will be implemented in backend integration
-    toast({
-      title: "Registration submitted",
-      description: "Redirecting to confirmation page...",
-    });
-    setTimeout(() => setLocation("/register/thanks"), 1000);
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Passwords do not match",
+        description: "Please confirm your password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await apiRequest("POST", "/api/auth/register", {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        companyName: formData.companyName,
+        legalName: formData.legalName,
+        website: formData.website,
+        taxId: formData.taxId,
+        businessType: formData.businessType,
+        contactName: formData.contactName,
+        addressPhone: formData.addressPhone,
+        street1: formData.street1,
+        street2: formData.street2,
+        city: formData.city,
+        state: formData.state,
+        postalCode: formData.postalCode,
+      });
+
+      toast({
+        title: "Registration submitted",
+        description: "Redirecting to confirmation page...",
+      });
+      setTimeout(() => setLocation("/register/thanks"), 500);
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "Unable to submit application",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleChange = (name: string, value: string) => {

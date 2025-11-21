@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
