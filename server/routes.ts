@@ -1084,6 +1084,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a variant and its pricing/inventory
+  app.patch("/api/admin/device-variants/:id", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        storage: z.string().optional(),
+        color: z.string().optional(),
+        conditionGrade: z.string().optional(),
+        networkLockStatus: z.string().optional(),
+        unitPrice: z.number().optional(),
+        quantity: z.number().optional(),
+        minOrderQuantity: z.number().optional(),
+      });
+
+      const data = schema.parse(req.body);
+      const variantId = req.params.id;
+
+      const variant = await storage.getDeviceVariant(variantId);
+      if (!variant) {
+        return res.status(404).json({ error: "Variant not found" });
+      }
+
+      const updatedVariant = await storage.updateDeviceVariant(variantId, {
+        storage: data.storage ?? variant.storage,
+        color: data.color ?? variant.color,
+        conditionGrade: (data.conditionGrade as any) ?? variant.conditionGrade,
+        networkLockStatus: (data.networkLockStatus as any) ?? variant.networkLockStatus,
+      });
+
+      let inventory = await storage.getInventoryByVariantId(variantId);
+      if (data.quantity !== undefined || data.minOrderQuantity !== undefined) {
+        if (inventory) {
+          inventory = await storage.updateInventory(inventory.id, {
+            quantityAvailable: data.quantity ?? inventory.quantityAvailable,
+            minOrderQuantity: data.minOrderQuantity ?? inventory.minOrderQuantity,
+          });
+        } else {
+          inventory = await storage.createInventory({
+            deviceVariantId: variantId,
+            quantityAvailable: data.quantity ?? 0,
+            minOrderQuantity: data.minOrderQuantity ?? 1,
+            status: "in_stock",
+          });
+        }
+      }
+
+      let priceTier;
+      if (data.unitPrice !== undefined) {
+        const tiers = await storage.getPriceTiersByVariantId(variantId);
+        if (tiers.length > 0) {
+          priceTier = await storage.updatePriceTier(tiers[0].id, { unitPrice: data.unitPrice });
+        } else {
+          priceTier = await storage.createPriceTier({
+            deviceVariantId: variantId,
+            minQuantity: 1,
+            maxQuantity: null,
+            unitPrice: data.unitPrice,
+            currency: "USD",
+            isActive: true,
+          });
+        }
+      }
+
+      res.json({ variant: updatedVariant, inventory, priceTier });
+    } catch (error: any) {
+      console.error("Update variant error:", error);
+      res.status(500).json({ error: "Failed to update variant" });
+    }
+  });
+
+  // Delete a variant entirely
+  app.delete("/api/admin/device-variants/:id", requireAdmin, async (req, res) => {
+    try {
+      const variantId = req.params.id;
+      await storage.deletePriceTiersByVariantId(variantId);
+      await storage.deleteInventoryByVariantId(variantId);
+      await storage.deleteDeviceVariant(variantId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete variant error:", error);
+      res.status(500).json({ error: "Failed to delete variant" });
+    }
+  });
+
   // Bulk import devices (admin only)
   app.post("/api/admin/device-import", requireAdmin, async (req, res) => {
     try {

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, Search, AlertTriangle, Upload } from "lucide-react";
+import { Package, Search, AlertTriangle, Upload, Pencil, Trash2, Plus, Minus, SlidersHorizontal, RefreshCw } from "lucide-react";
 import { ConditionBadge } from "@/components/ConditionBadge";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,6 +40,12 @@ export default function Inventory() {
     unitPrice: "0",
     quantity: "0",
     minOrderQuantity: "1",
+  });
+  const [filters, setFilters] = useState({
+    brand: "",
+    color: "",
+    condition: "",
+    stock: "all",
   });
 
   const { toast } = useToast();
@@ -104,6 +110,41 @@ export default function Inventory() {
     },
   });
 
+  const updateVariantMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: any }) => {
+      return await apiRequest("PATCH", `/api/admin/device-variants/${id}", payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
+      toast({ title: "Variant updated", description: "Inventory details saved" });
+      setEditDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Unable to update variant",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteVariantMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/admin/device-variants/${id}`);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
+      toast({ title: "Variant removed", description: "The item has been deleted" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete failed",
+        description: error.message || "Unable to delete variant",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     addDeviceMutation.mutate();
@@ -123,7 +164,53 @@ export default function Inventory() {
     }
   };
 
-  const allVariants = devices?.flatMap((device: any) => 
+  const openEditDialog = (variant: any) => {
+    setEditingVariant(variant);
+    setEditForm({
+      storage: variant.storage,
+      color: variant.color,
+      conditionGrade: variant.conditionGrade,
+      networkLockStatus: variant.networkLockStatus,
+      unitPrice: String(variant.unitPrice || "0"),
+      quantity: String(variant.inventory?.quantityAvailable ?? "0"),
+      minOrderQuantity: String(variant.inventory?.minOrderQuantity ?? "1"),
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleVariantSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVariant) return;
+    updateVariantMutation.mutate({
+      id: editingVariant.id,
+      payload: {
+        storage: editForm.storage,
+        color: editForm.color,
+        conditionGrade: editForm.conditionGrade,
+        networkLockStatus: editForm.networkLockStatus,
+        unitPrice: parseFloat(editForm.unitPrice || "0"),
+        quantity: parseInt(editForm.quantity || "0", 10),
+        minOrderQuantity: parseInt(editForm.minOrderQuantity || "1", 10),
+      },
+    });
+  };
+
+  const adjustQuantity = (variant: any, delta: number) => {
+    const current = variant.inventory?.quantityAvailable ?? 0;
+    const next = Math.max(0, current + delta);
+    updateVariantMutation.mutate({
+      id: variant.id,
+      payload: { quantity: next },
+    });
+  };
+
+  const handleDelete = (variant: any) => {
+    if (confirm(`Delete ${variant.device.marketingName} (${variant.storage} ${variant.color})?`)) {
+      deleteVariantMutation.mutate(variant.id);
+    }
+  };
+
+  const allVariants = devices?.flatMap((device: any) =>
     device.variants?.map((variant: any) => ({
       ...variant,
       device: {
@@ -131,18 +218,34 @@ export default function Inventory() {
         marketingName: device.marketingName,
         sku: device.sku,
       },
+      unitPrice: variant.priceTiers?.[0]?.unitPrice,
     }))
   ) || [];
 
+  const brandOptions = Array.from(new Set(devices?.map((d: any) => d.brand) || [])).filter(Boolean);
+  const colorOptions = Array.from(new Set(allVariants.map((v: any) => v.color) || [])).filter(Boolean);
+  const conditionOptions = Array.from(new Set(allVariants.map((v: any) => v.conditionGrade) || [])).filter(Boolean);
+
   const filteredVariants = allVariants.filter((variant: any) => {
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       variant.device.marketingName.toLowerCase().includes(searchLower) ||
       variant.device.brand.toLowerCase().includes(searchLower) ||
       variant.device.sku.toLowerCase().includes(searchLower) ||
       variant.storage.toLowerCase().includes(searchLower) ||
-      variant.color.toLowerCase().includes(searchLower)
-    );
+      variant.color.toLowerCase().includes(searchLower);
+
+    const matchesBrand = !filters.brand || variant.device.brand === filters.brand;
+    const matchesColor = !filters.color || variant.color === filters.color;
+    const matchesCondition = !filters.condition || variant.conditionGrade === filters.condition;
+    const quantity = variant.inventory?.quantityAvailable ?? 0;
+    const matchesStock =
+      filters.stock === "all" ||
+      (filters.stock === "low" && quantity > 0 && quantity < 20) ||
+      (filters.stock === "out" && quantity === 0) ||
+      (filters.stock === "in" && quantity >= 20);
+
+    return matchesSearch && matchesBrand && matchesColor && matchesCondition && matchesStock;
   });
 
   const lowStockVariants = allVariants.filter((v: any) => 
@@ -197,15 +300,84 @@ export default function Inventory() {
 
       <Card>
         <CardHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search inventory..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-inventory"
-            />
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search inventory..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-inventory"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <SlidersHorizontal className="h-4 w-4" /> Filters
+              </div>
+              <Select value={filters.brand} onValueChange={(value) => setFilters({ ...filters, brand: value })}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Brands</SelectItem>
+                  {brandOptions.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filters.color} onValueChange={(value) => setFilters({ ...filters, color: value })}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Color" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Colors</SelectItem>
+                  {colorOptions.map((color) => (
+                    <SelectItem key={color} value={color}>
+                      {color}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filters.condition} onValueChange={(value) => setFilters({ ...filters, condition: value })}>
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Condition" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Conditions</SelectItem>
+                  {conditionOptions.map((condition) => (
+                    <SelectItem key={condition} value={condition}>
+                      Grade {condition}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filters.stock} onValueChange={(value) => setFilters({ ...filters, stock: value })}>
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stock</SelectItem>
+                  <SelectItem value="in">Healthy (20+)</SelectItem>
+                  <SelectItem value="low">Low Stock (&lt;20)</SelectItem>
+                  <SelectItem value="out">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilters({ brand: "", color: "", condition: "", stock: "all" })}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reset
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -213,39 +385,169 @@ export default function Inventory() {
             {filteredVariants.map((variant: any) => (
               <div
                 key={variant.id}
-                className="flex items-center justify-between p-4 border rounded-md"
+                className="flex flex-col gap-3 p-4 border rounded-md"
                 data-testid={`inventory-item-${variant.id}`}
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline">{variant.device.brand}</Badge>
-                    <h3 className="font-semibold">{variant.device.marketingName}</h3>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <Badge variant="outline">{variant.device.brand}</Badge>
+                      <h3 className="font-semibold">{variant.device.marketingName}</h3>
+                      <Badge variant="secondary">{variant.storage}</Badge>
+                      <Badge variant="secondary">{variant.color}</Badge>
+                      <ConditionBadge grade={variant.conditionGrade} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      <span>SKU: {variant.device.sku}</span>
+                      <span>Network: {variant.networkLockStatus}</span>
+                      <span>Min order: {variant.inventory?.minOrderQuantity ?? 1}</span>
+                      {typeof variant.unitPrice === "number" && (
+                        <span className="text-foreground font-semibold">${variant.unitPrice.toFixed(2)}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>SKU: {variant.device.sku}</span>
-                    <span>•</span>
-                    <span>{variant.storage} • {variant.color}</span>
-                    <span>•</span>
-                    <ConditionBadge grade={variant.conditionGrade} />
-                  </div>
+
+                  {variant.inventory && (
+                    <div className="text-right min-w-[150px]">
+                      <p className="text-2xl font-bold">
+                        {variant.inventory.quantityAvailable}
+                      </p>
+                      <p className="text-sm text-muted-foreground">units available</p>
+                      {variant.inventory.quantityAvailable < 20 && (
+                        <Badge variant="destructive" className="mt-1">Low Stock</Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {variant.inventory && (
-                  <div className="text-right">
-                    <p className="text-2xl font-bold">
-                      {variant.inventory.quantityAvailable}
-                    </p>
-                    <p className="text-sm text-muted-foreground">units available</p>
-                    {variant.inventory.quantityAvailable < 20 && (
-                      <Badge variant="destructive" className="mt-1">Low Stock</Badge>
-                    )}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => adjustQuantity(variant, -1)}
+                      disabled={updateVariantMutation.isPending}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => adjustQuantity(variant, 1)}
+                      disabled={updateVariantMutation.isPending}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openEditDialog(variant)}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(variant)}
+                      disabled={deleteVariantMutation.isPending}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </Button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Edit Variant</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleVariantSave}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Storage</Label>
+                <Input value={editForm.storage} onChange={(e) => setEditForm({ ...editForm, storage: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <Input value={editForm.color} onChange={(e) => setEditForm({ ...editForm, color: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Condition</Label>
+                <Select
+                  value={editForm.conditionGrade}
+                  onValueChange={(value) => setEditForm({ ...editForm, conditionGrade: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">Grade A</SelectItem>
+                    <SelectItem value="B">Grade B</SelectItem>
+                    <SelectItem value="C">Grade C</SelectItem>
+                    <SelectItem value="D">Grade D</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Network</Label>
+                <Select
+                  value={editForm.networkLockStatus}
+                  onValueChange={(value) => setEditForm({ ...editForm, networkLockStatus: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unlocked">Unlocked</SelectItem>
+                    <SelectItem value="locked">Locked</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Unit Price (USD)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={editForm.unitPrice}
+                  onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Quantity Available</Label>
+                <Input
+                  type="number"
+                  value={editForm.quantity}
+                  onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Minimum Order Qty</Label>
+                <Input
+                  type="number"
+                  value={editForm.minOrderQuantity}
+                  onChange={(e) => setEditForm({ ...editForm, minOrderQuantity: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updateVariantMutation.isPending}>
+                {updateVariantMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-xl">
