@@ -172,7 +172,7 @@ async function seed() {
       deviceVariantId: iphone13Pro128A.id,
       minQuantity: 5,
       maxQuantity: 24,
-      unitPrice: "425.00",
+      unitPrice: 425,
       currency: "USD",
       isActive: true,
     });
@@ -180,7 +180,7 @@ async function seed() {
       deviceVariantId: iphone13Pro128A.id,
       minQuantity: 25,
       maxQuantity: 49,
-      unitPrice: "415.00",
+      unitPrice: 415,
       currency: "USD",
       isActive: true,
     });
@@ -188,7 +188,7 @@ async function seed() {
       deviceVariantId: iphone13Pro128A.id,
       minQuantity: 50,
       maxQuantity: null,
-      unitPrice: "405.00",
+      unitPrice: 405,
       currency: "USD",
       isActive: true,
     });
@@ -198,7 +198,7 @@ async function seed() {
       deviceVariantId: iphone13Pro256B.id,
       minQuantity: 5,
       maxQuantity: 24,
-      unitPrice: "445.00",
+      unitPrice: 445,
       currency: "USD",
       isActive: true,
     });
@@ -206,7 +206,7 @@ async function seed() {
       deviceVariantId: iphone13Pro256B.id,
       minQuantity: 25,
       maxQuantity: null,
-      unitPrice: "435.00",
+      unitPrice: 435,
       currency: "USD",
       isActive: true,
     });
@@ -216,7 +216,7 @@ async function seed() {
       deviceVariantId: galaxyS21128A.id,
       minQuantity: 10,
       maxQuantity: 29,
-      unitPrice: "285.00",
+      unitPrice: 285,
       currency: "USD",
       isActive: true,
     });
@@ -224,7 +224,7 @@ async function seed() {
       deviceVariantId: galaxyS21128A.id,
       minQuantity: 30,
       maxQuantity: null,
-      unitPrice: "275.00",
+      unitPrice: 275,
       currency: "USD",
       isActive: true,
     });
@@ -234,7 +234,7 @@ async function seed() {
       deviceVariantId: ipadAir64B.id,
       minQuantity: 3,
       maxQuantity: 9,
-      unitPrice: "365.00",
+      unitPrice: 365,
       currency: "USD",
       isActive: true,
     });
@@ -242,7 +242,7 @@ async function seed() {
       deviceVariantId: ipadAir64B.id,
       minQuantity: 10,
       maxQuantity: null,
-      unitPrice: "355.00",
+      unitPrice: 355,
       currency: "USD",
       isActive: true,
     });
@@ -279,7 +279,7 @@ async function seed() {
       primaryPhone: "+1-555-0200",
       billingEmail: "billing@testcompany.test",
       status: "approved",
-      creditLimit: "50000.00",
+      creditLimit: 50000,
     });
 
     await storage.createCompanyUser({

@@ -1,9 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
-import pgSession from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import { storage } from "./storage";
-import { pool } from "./db";
 import bcrypt from "bcrypt";
 import Stripe from "stripe";
 import { z } from "zod";
@@ -93,13 +92,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ? (() => { throw new Error('SESSION_SECRET must be set in production'); })()
       : 'dev-secret-only-for-local-development');
 
-  const PgSession = pgSession(session);
+  const MemoryStore = createMemoryStore(session);
 
   app.use(session({
-    store: new PgSession({
-      pool,
-      tableName: "session",
-      createTableIfMissing: true,
+    store: new MemoryStore({
+      checkPeriod: 24 * 60 * 60 * 1000,
     }),
     secret: sessionSecret,
     resave: false,
