@@ -86,15 +86,12 @@ export default function AdminQuotes() {
 
   const updateQuoteMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/quotes/${selectedQuote!.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          status: newStatus,
-          subtotal,
-          shippingEstimate,
-          taxEstimate,
-          totalEstimate,
-        }),
+      return await apiRequest("PATCH", `/api/quotes/${selectedQuote!.id}`, {
+        status: newStatus,
+        subtotal: parseFloat(subtotal || "0"),
+        shippingEstimate: parseFloat(shippingEstimate || "0"),
+        taxEstimate: parseFloat(taxEstimate || "0"),
+        totalEstimate: parseFloat(totalEstimate || "0"),
       });
     },
     onSuccess: () => {
