@@ -35,6 +35,7 @@ interface Device {
     minPrice: string;
     inventory?: {
       quantityAvailable?: number;
+      minOrderQuantity?: number;
     };
   }>;
 }
@@ -78,9 +79,10 @@ export default function BuyerCatalog() {
     setQuantities((prev) => {
       const next = { ...prev };
       devices.forEach((device) => {
-        const firstVariantId = device.variants?.[0]?.id;
-        if (firstVariantId && next[firstVariantId] === undefined) {
-          next[firstVariantId] = 1;
+        const firstVariant = device.variants?.[0];
+        if (firstVariant?.id && next[firstVariant.id] === undefined) {
+          const minOrder = Math.max(1, firstVariant.inventory?.minOrderQuantity ?? 1);
+          next[firstVariant.id] = minOrder;
         }
       });
       return next;
@@ -128,24 +130,29 @@ export default function BuyerCatalog() {
 
   const getQuantity = (variantId: string) => quantities[variantId] || 1;
 
-  const updateQuantity = (variantId: string, change: number, maxQuantity?: number) => {
+  const updateQuantity = (variantId: string, change: number, maxQuantity?: number, minQuantity?: number) => {
     const currentQty = getQuantity(variantId);
+    const safeMin = minQuantity ?? 1;
     const safeMax = maxQuantity ?? Number.MAX_SAFE_INTEGER;
-    const newQty = Math.max(1, Math.min(safeMax, currentQty + change));
+    const newQty = Math.max(safeMin, Math.min(safeMax, currentQty + change));
     setQuantities((prev) => ({ ...prev, [variantId]: newQty }));
   };
 
-  const handleQuantityInput = (variantId: string, value: string, maxQuantity?: number) => {
+  const handleQuantityInput = (variantId: string, value: string, maxQuantity?: number, minQuantity?: number) => {
     const parsed = parseInt(value, 10);
+    const safeMin = minQuantity ?? 1;
     const safeMax = maxQuantity ?? Number.MAX_SAFE_INTEGER;
-    const numericValue = Number.isNaN(parsed) ? 1 : parsed;
-    const safeValue = Math.max(1, Math.min(safeMax, numericValue));
+    const numericValue = Number.isNaN(parsed) ? safeMin : parsed;
+    const safeValue = Math.max(safeMin, Math.min(safeMax, numericValue));
     setQuantities((prev) => ({ ...prev, [variantId]: safeValue }));
   };
 
   const handleVariantSelect = (deviceId: string, variantId: string) => {
+    const device = devices?.find((d) => d.id === deviceId);
+    const variant = device?.variants?.find((v) => v.id === variantId);
+    const minOrder = Math.max(1, variant?.inventory?.minOrderQuantity ?? 1);
     setSelectedVariants((prev) => ({ ...prev, [deviceId]: variantId }));
-    setQuantities((prev) => ({ ...prev, [variantId]: prev[variantId] ?? 1 }));
+    setQuantities((prev) => ({ ...prev, [variantId]: prev[variantId] ?? minOrder }));
   };
 
   return (
@@ -247,7 +254,11 @@ export default function BuyerCatalog() {
                   const selectedVariantId = getSelectedVariantId(device);
                   const selectedVariant = device.variants?.find((variant) => variant.id === selectedVariantId);
                   const maxAvailable = selectedVariant?.inventory?.quantityAvailable;
-                  const quantityValue = selectedVariantId ? getQuantity(selectedVariantId) : 1;
+                  const minOrder = Math.max(1, selectedVariant?.inventory?.minOrderQuantity ?? 1);
+                  const safeMax = maxAvailable ?? Number.MAX_SAFE_INTEGER;
+                  const quantityValue = selectedVariantId
+                    ? Math.min(safeMax, Math.max(minOrder, getQuantity(selectedVariantId)))
+                    : minOrder;
 
                   const goToDetails = () => setLocation(`/buyer/devices/${device.slug}`);
 
@@ -363,7 +374,7 @@ export default function BuyerCatalog() {
                               onClick={(event) => {
                                 event.stopPropagation();
                                 if (selectedVariantId) {
-                                  updateQuantity(selectedVariantId, -1);
+                                  updateQuantity(selectedVariantId, -1, maxAvailable, minOrder);
                                 }
                               }}
                               disabled={!selectedVariantId}
@@ -373,14 +384,14 @@ export default function BuyerCatalog() {
                             </Button>
                             <Input
                               type="number"
-                              min="1"
                               value={quantityValue}
                               onClick={(event) => event.stopPropagation()}
                               onChange={(e) => {
                                 if (selectedVariantId) {
-                                  handleQuantityInput(selectedVariantId, e.target.value, maxAvailable);
+                                  handleQuantityInput(selectedVariantId, e.target.value, maxAvailable, minOrder);
                                 }
                               }}
+                              min={minOrder}
                               className="h-8 w-16 text-center"
                               disabled={!selectedVariantId}
                               data-testid={`input-quantity-${device.id}`}
@@ -392,7 +403,7 @@ export default function BuyerCatalog() {
                               onClick={(event) => {
                                 event.stopPropagation();
                                 if (selectedVariantId) {
-                                  updateQuantity(selectedVariantId, 1, maxAvailable);
+                                  updateQuantity(selectedVariantId, 1, maxAvailable, minOrder);
                                 }
                               }}
                               disabled={!selectedVariantId}
