@@ -1,18 +1,10 @@
 import "dotenv/config";
-import pg from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "@shared/schema";
 
-const { Pool } = pg;
+const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
+const databaseFile = databaseUrl.replace(/^file:/, "");
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to set it in .env?",
-  );
-}
-
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-export const db = drizzle(pool, { schema });
+export const sqlite = new Database(databaseFile);
+export const db = drizzle(sqlite, { schema });

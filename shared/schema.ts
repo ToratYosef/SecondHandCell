@@ -1,35 +1,42 @@
+import { randomUUID } from "crypto";
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, decimal, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import {
+  sqliteEnum,
+  sqliteTable,
+  integer,
+  real,
+  text,
+} from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["buyer", "admin", "super_admin"]);
-export const companyStatusEnum = pgEnum("company_status", ["pending_review", "approved", "rejected", "suspended"]);
-export const companyUserRoleEnum = pgEnum("company_user_role", ["owner", "admin", "buyer"]);
-export const conditionGradeEnum = pgEnum("condition_grade", ["A", "B", "C", "D"]);
-export const networkLockStatusEnum = pgEnum("network_lock_status", ["unlocked", "locked", "other"]);
-export const inventoryStatusEnum = pgEnum("inventory_status", ["in_stock", "reserved", "incoming", "discontinued"]);
-export const orderStatusEnum = pgEnum("order_status", ["pending_payment", "payment_review", "processing", "shipped", "completed", "cancelled"]);
-export const paymentStatusEnum = pgEnum("payment_status", ["unpaid", "paid", "partially_paid", "refunded"]);
-export const paymentMethodEnum = pgEnum("payment_method", ["card", "wire", "ach", "terms", "other"]);
-export const quoteStatusEnum = pgEnum("quote_status", ["draft", "sent", "accepted", "rejected", "expired"]);
-export const supportTicketStatusEnum = pgEnum("support_ticket_status", ["open", "in_progress", "closed"]);
-export const supportTicketPriorityEnum = pgEnum("support_ticket_priority", ["low", "medium", "high"]);
+export const userRoleEnum = sqliteEnum("user_role", ["buyer", "admin", "super_admin"]);
+export const companyStatusEnum = sqliteEnum("company_status", ["pending_review", "approved", "rejected", "suspended"]);
+export const companyUserRoleEnum = sqliteEnum("company_user_role", ["owner", "admin", "buyer"]);
+export const conditionGradeEnum = sqliteEnum("condition_grade", ["A", "B", "C", "D"]);
+export const networkLockStatusEnum = sqliteEnum("network_lock_status", ["unlocked", "locked", "other"]);
+export const inventoryStatusEnum = sqliteEnum("inventory_status", ["in_stock", "reserved", "incoming", "discontinued"]);
+export const orderStatusEnum = sqliteEnum("order_status", ["pending_payment", "payment_review", "processing", "shipped", "completed", "cancelled"]);
+export const paymentStatusEnum = sqliteEnum("payment_status", ["unpaid", "paid", "partially_paid", "refunded"]);
+export const paymentMethodEnum = sqliteEnum("payment_method", ["card", "wire", "ach", "terms", "other"]);
+export const quoteStatusEnum = sqliteEnum("quote_status", ["draft", "sent", "accepted", "rejected", "expired"]);
+export const supportTicketStatusEnum = sqliteEnum("support_ticket_status", ["open", "in_progress", "closed"]);
+export const supportTicketPriorityEnum = sqliteEnum("support_ticket_priority", ["low", "medium", "high"]);
 
 // Users table
-export const users = pgTable("users", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: userRoleEnum("role").notNull().default("buyer"),
   phone: text("phone"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  lastLoginAt: timestamp("last_login_at"),
-  isActive: boolean("is_active").notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -42,8 +49,8 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 // Companies table
-export const companies = pgTable("companies", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const companies = sqliteTable("companies", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   name: text("name").notNull(),
   legalName: text("legal_name").notNull(),
   taxId: text("tax_id"),
@@ -52,9 +59,9 @@ export const companies = pgTable("companies", {
   primaryPhone: text("primary_phone"),
   billingEmail: text("billing_email"),
   status: companyStatusEnum("status").notNull().default("pending_review"),
-  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).default("0"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  creditLimit: real("credit_limit").default(0),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -69,12 +76,12 @@ export const companiesRelations = relations(companies, ({ many }) => ({
 }));
 
 // Company Users (join table)
-export const companyUsers = pgTable("company_users", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
-  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+export const companyUsers = sqliteTable("company_users", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   roleInCompany: companyUserRoleEnum("role_in_company").notNull().default("buyer"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const companyUsersRelations = relations(companyUsers, ({ one }) => ({
@@ -89,12 +96,12 @@ export const companyUsersRelations = relations(companyUsers, ({ one }) => ({
 }));
 
 // Device Categories
-export const deviceCategories = pgTable("device_categories", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const deviceCategories = sqliteTable("device_categories", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const deviceCategoriesRelations = relations(deviceCategories, ({ many }) => ({
@@ -102,19 +109,19 @@ export const deviceCategoriesRelations = relations(deviceCategories, ({ many }) 
 }));
 
 // Device Models
-export const deviceModels = pgTable("device_models", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const deviceModels = sqliteTable("device_models", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   brand: text("brand").notNull(),
   name: text("name").notNull(),
   marketingName: text("marketing_name"),
   sku: text("sku").notNull().unique(),
   slug: text("slug").notNull().unique(),
-  categoryId: varchar("category_id", { length: 36 }).notNull().references(() => deviceCategories.id),
+  categoryId: text("category_id").notNull().references(() => deviceCategories.id),
   imageUrl: text("image_url"),
   description: text("description"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  isActive: boolean("is_active").notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
 });
 
 export const deviceModelsRelations = relations(deviceModels, ({ one, many }) => ({
@@ -126,17 +133,17 @@ export const deviceModelsRelations = relations(deviceModels, ({ one, many }) => 
 }));
 
 // Device Variants
-export const deviceVariants = pgTable("device_variants", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  deviceModelId: varchar("device_model_id", { length: 36 }).notNull().references(() => deviceModels.id, { onDelete: "cascade" }),
+export const deviceVariants = sqliteTable("device_variants", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  deviceModelId: text("device_model_id").notNull().references(() => deviceModels.id, { onDelete: "cascade" }),
   storage: text("storage").notNull(),
   color: text("color").notNull(),
   networkLockStatus: networkLockStatusEnum("network_lock_status").notNull().default("unlocked"),
   conditionGrade: conditionGradeEnum("condition_grade").notNull(),
   internalCode: text("internal_code"),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const deviceVariantsRelations = relations(deviceVariants, ({ one, many }) => ({
@@ -153,15 +160,15 @@ export const deviceVariantsRelations = relations(deviceVariants, ({ one, many })
 }));
 
 // Inventory Items
-export const inventoryItems = pgTable("inventory_items", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  deviceVariantId: varchar("device_variant_id", { length: 36 }).notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+export const inventoryItems = sqliteTable("inventory_items", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
   quantityAvailable: integer("quantity_available").notNull().default(0),
   minOrderQuantity: integer("min_order_quantity").notNull().default(1),
   location: text("location"),
   status: inventoryStatusEnum("status").notNull().default("in_stock"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const inventoryItemsRelations = relations(inventoryItems, ({ one }) => ({
@@ -172,16 +179,16 @@ export const inventoryItemsRelations = relations(inventoryItems, ({ one }) => ({
 }));
 
 // Price Tiers
-export const priceTiers = pgTable("price_tiers", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  deviceVariantId: varchar("device_variant_id", { length: 36 }).notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+export const priceTiers = sqliteTable("price_tiers", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
   minQuantity: integer("min_quantity").notNull(),
   maxQuantity: integer("max_quantity"),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: real("unit_price").notNull(),
   currency: text("currency").notNull().default("USD"),
-  effectiveFrom: timestamp("effective_from").notNull().defaultNow(),
-  effectiveTo: timestamp("effective_to"),
-  isActive: boolean("is_active").notNull().default(true),
+  effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  effectiveTo: integer("effective_to", { mode: "timestamp" }),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
 });
 
 export const priceTiersRelations = relations(priceTiers, ({ one }) => ({
@@ -192,12 +199,12 @@ export const priceTiersRelations = relations(priceTiers, ({ one }) => ({
 }));
 
 // Carts
-export const carts = pgTable("carts", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
-  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+export const carts = sqliteTable("carts", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const cartsRelations = relations(carts, ({ one, many }) => ({
@@ -213,14 +220,14 @@ export const cartsRelations = relations(carts, ({ one, many }) => ({
 }));
 
 // Cart Items
-export const cartItems = pgTable("cart_items", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  cartId: varchar("cart_id", { length: 36 }).notNull().references(() => carts.id, { onDelete: "cascade" }),
-  deviceVariantId: varchar("device_variant_id", { length: 36 }).notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+export const cartItems = sqliteTable("cart_items", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  cartId: text("cart_id").notNull().references(() => carts.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull(),
-  unitPriceSnapshot: decimal("unit_price_snapshot", { precision: 10, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  unitPriceSnapshot: real("unit_price_snapshot").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const cartItemsRelations = relations(cartItems, ({ one }) => ({
@@ -235,26 +242,26 @@ export const cartItemsRelations = relations(cartItems, ({ one }) => ({
 }));
 
 // Orders
-export const orders = pgTable("orders", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const orders = sqliteTable("orders", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   orderNumber: text("order_number").notNull().unique(),
-  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
-  createdByUserId: varchar("created_by_user_id", { length: 36 }).notNull().references(() => users.id),
+  companyId: text("company_id").notNull().references(() => companies.id),
+  createdByUserId: text("created_by_user_id").notNull().references(() => users.id),
   status: orderStatusEnum("status").notNull().default("pending_payment"),
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
-  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull().default("0"),
-  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull().default("0"),
-  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).notNull().default("0"),
-  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  subtotal: real("subtotal").notNull(),
+  shippingCost: real("shipping_cost").notNull().default(0),
+  taxAmount: real("tax_amount").notNull().default(0),
+  discountAmount: real("discount_amount").notNull().default(0),
+  total: real("total").notNull(),
   currency: text("currency").notNull().default("USD"),
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("unpaid"),
   paymentMethod: paymentMethodEnum("payment_method"),
-  shippingAddressId: varchar("shipping_address_id", { length: 36 }).references(() => shippingAddresses.id),
-  billingAddressId: varchar("billing_address_id", { length: 36 }).references(() => billingAddresses.id),
+  shippingAddressId: text("shipping_address_id").references(() => shippingAddresses.id),
+  billingAddressId: text("billing_address_id").references(() => billingAddresses.id),
   notesInternal: text("notes_internal"),
   notesCustomer: text("notes_customer"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
@@ -273,14 +280,14 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 }));
 
 // Order Items
-export const orderItems = pgTable("order_items", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id", { length: 36 }).notNull().references(() => orders.id, { onDelete: "cascade" }),
-  deviceVariantId: varchar("device_variant_id", { length: 36 }).notNull().references(() => deviceVariants.id),
+export const orderItems = sqliteTable("order_items", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id),
   quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  unitPrice: real("unit_price").notNull(),
+  lineTotal: real("line_total").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
@@ -295,9 +302,9 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
 }));
 
 // Shipping Addresses
-export const shippingAddresses = pgTable("shipping_addresses", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+export const shippingAddresses = sqliteTable("shipping_addresses", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   label: text("label"),
   contactName: text("contact_name").notNull(),
   phone: text("phone").notNull(),
@@ -307,9 +314,9 @@ export const shippingAddresses = pgTable("shipping_addresses", {
   state: text("state").notNull(),
   postalCode: text("postal_code").notNull(),
   country: text("country").notNull().default("USA"),
-  isDefault: boolean("is_default").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const shippingAddressesRelations = relations(shippingAddresses, ({ one }) => ({
@@ -320,9 +327,9 @@ export const shippingAddressesRelations = relations(shippingAddresses, ({ one })
 }));
 
 // Billing Addresses
-export const billingAddresses = pgTable("billing_addresses", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+export const billingAddresses = sqliteTable("billing_addresses", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   label: text("label"),
   contactName: text("contact_name").notNull(),
   phone: text("phone").notNull(),
@@ -332,9 +339,9 @@ export const billingAddresses = pgTable("billing_addresses", {
   state: text("state").notNull(),
   postalCode: text("postal_code").notNull(),
   country: text("country").notNull().default("USA"),
-  isDefault: boolean("is_default").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const billingAddressesRelations = relations(billingAddresses, ({ one }) => ({
@@ -345,20 +352,20 @@ export const billingAddressesRelations = relations(billingAddresses, ({ one }) =
 }));
 
 // Quotes
-export const quotes = pgTable("quotes", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const quotes = sqliteTable("quotes", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   quoteNumber: text("quote_number").notNull().unique(),
-  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
-  createdByUserId: varchar("created_by_user_id", { length: 36 }).notNull().references(() => users.id),
+  companyId: text("company_id").notNull().references(() => companies.id),
+  createdByUserId: text("created_by_user_id").notNull().references(() => users.id),
   status: quoteStatusEnum("status").notNull().default("draft"),
-  validUntil: timestamp("valid_until"),
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
-  shippingEstimate: decimal("shipping_estimate", { precision: 10, scale: 2 }).notNull().default("0"),
-  taxEstimate: decimal("tax_estimate", { precision: 10, scale: 2 }).notNull().default("0"),
-  totalEstimate: decimal("total_estimate", { precision: 10, scale: 2 }).notNull().default("0"),
+  validUntil: integer("valid_until", { mode: "timestamp" }),
+  subtotal: real("subtotal").notNull().default(0),
+  shippingEstimate: real("shipping_estimate").notNull().default(0),
+  taxEstimate: real("tax_estimate").notNull().default(0),
+  totalEstimate: real("total_estimate").notNull().default(0),
   currency: text("currency").notNull().default("USD"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const quotesRelations = relations(quotes, ({ one, many }) => ({
@@ -375,14 +382,14 @@ export const quotesRelations = relations(quotes, ({ one, many }) => ({
 }));
 
 // Quote Items
-export const quoteItems = pgTable("quote_items", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  quoteId: varchar("quote_id", { length: 36 }).notNull().references(() => quotes.id, { onDelete: "cascade" }),
-  deviceVariantId: varchar("device_variant_id", { length: 36 }).notNull().references(() => deviceVariants.id),
+export const quoteItems = sqliteTable("quote_items", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  quoteId: text("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id),
   quantity: integer("quantity").notNull(),
-  proposedUnitPrice: decimal("proposed_unit_price", { precision: 10, scale: 2 }).notNull(),
-  lineTotalEstimate: decimal("line_total_estimate", { precision: 10, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  proposedUnitPrice: real("proposed_unit_price").notNull(),
+  lineTotalEstimate: real("line_total_estimate").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
@@ -397,13 +404,13 @@ export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
 }));
 
 // Saved Lists
-export const savedLists = pgTable("saved_lists", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+export const savedLists = sqliteTable("saved_lists", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  createdByUserId: varchar("created_by_user_id", { length: 36 }).notNull().references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUserId: text("created_by_user_id").notNull().references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const savedListsRelations = relations(savedLists, ({ one, many }) => ({
@@ -419,10 +426,10 @@ export const savedListsRelations = relations(savedLists, ({ one, many }) => ({
 }));
 
 // Saved List Items
-export const savedListItems = pgTable("saved_list_items", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  savedListId: varchar("saved_list_id", { length: 36 }).notNull().references(() => savedLists.id, { onDelete: "cascade" }),
-  deviceVariantId: varchar("device_variant_id", { length: 36 }).notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
+export const savedListItems = sqliteTable("saved_list_items", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  savedListId: text("saved_list_id").notNull().references(() => savedLists.id, { onDelete: "cascade" }),
+  deviceVariantId: text("device_variant_id").notNull().references(() => deviceVariants.id, { onDelete: "cascade" }),
   defaultQuantity: integer("default_quantity").notNull().default(1),
 });
 
@@ -438,15 +445,15 @@ export const savedListItemsRelations = relations(savedListItems, ({ one }) => ({
 }));
 
 // Payments
-export const payments = pgTable("payments", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id", { length: 36 }).notNull().references(() => orders.id, { onDelete: "cascade" }),
+export const payments = sqliteTable("payments", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  amount: real("amount").notNull(),
   currency: text("currency").notNull().default("USD"),
   status: text("status").notNull(),
   method: paymentMethodEnum("method").notNull(),
-  processedAt: timestamp("processed_at"),
+  processedAt: integer("processed_at", { mode: "timestamp" }),
 });
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
@@ -457,15 +464,15 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 }));
 
 // Shipments
-export const shipments = pgTable("shipments", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id", { length: 36 }).notNull().references(() => orders.id, { onDelete: "cascade" }),
+export const shipments = sqliteTable("shipments", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   carrier: text("carrier").notNull(),
   serviceLevel: text("service_level"),
   trackingNumber: text("tracking_number"),
   shippingLabelUrl: text("shipping_label_url"),
-  shippedAt: timestamp("shipped_at"),
-  estimatedDeliveryDate: timestamp("estimated_delivery_date"),
+  shippedAt: integer("shipped_at", { mode: "timestamp" }),
+  estimatedDeliveryDate: integer("estimated_delivery_date", { mode: "timestamp" }),
 });
 
 export const shipmentsRelations = relations(shipments, ({ one }) => ({
@@ -476,39 +483,39 @@ export const shipmentsRelations = relations(shipments, ({ one }) => ({
 }));
 
 // FAQs
-export const faqs = pgTable("faqs", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const faqs = sqliteTable("faqs", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   question: text("question").notNull(),
   answer: text("answer").notNull(),
   category: text("category").notNull(),
   displayOrder: integer("display_order").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Announcements
-export const announcements = pgTable("announcements", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+export const announcements = sqliteTable("announcements", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
   title: text("title").notNull(),
   body: text("body").notNull(),
-  startsAt: timestamp("starts_at"),
-  endsAt: timestamp("ends_at"),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startsAt: integer("starts_at", { mode: "timestamp" }),
+  endsAt: integer("ends_at", { mode: "timestamp" }),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Support Tickets
-export const supportTickets = pgTable("support_tickets", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id", { length: 36 }).references(() => companies.id, { onDelete: "cascade" }),
-  createdByUserId: varchar("created_by_user_id", { length: 36 }).references(() => users.id),
+export const supportTickets = sqliteTable("support_tickets", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  createdByUserId: text("created_by_user_id").references(() => users.id),
   subject: text("subject").notNull(),
   description: text("description").notNull(),
   status: supportTicketStatusEnum("status").notNull().default("open"),
   priority: supportTicketPriorityEnum("priority").notNull().default("medium"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
@@ -523,16 +530,16 @@ export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
 }));
 
 // Audit Logs
-export const auditLogs = pgTable("audit_logs", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  actorUserId: varchar("actor_user_id", { length: 36 }).references(() => users.id),
-  companyId: varchar("company_id", { length: 36 }).references(() => companies.id),
+export const auditLogs = sqliteTable("audit_logs", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  actorUserId: text("actor_user_id").references(() => users.id),
+  companyId: text("company_id").references(() => companies.id),
   action: text("action").notNull(),
   entityType: text("entity_type").notNull(),
   entityId: text("entity_id").notNull(),
   previousValues: text("previous_values"),
   newValues: text("new_values"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
