@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   FileCheck,
+  BarChart,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Companies", href: "/admin/companies", icon: Building2 },
+    { name: "Reports", href: "/admin/reports", icon: BarChart },
   { name: "Inventory", href: "/admin/inventory", icon: Package },
   { name: "Orders", href: "/admin/orders", icon: FileText },
   { name: "Quotes", href: "/admin/quotes", icon: FileCheck },

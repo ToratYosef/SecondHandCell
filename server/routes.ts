@@ -14,6 +14,8 @@ import {
   insertSavedListSchema,
   insertSavedListItemSchema,
 } from "@shared/schema";
+import { db } from "./db";
+import * as schema from "@shared/schema";
 
 const slugify = (value: string) =>
   value
@@ -963,6 +965,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk update companies (atomic) - e.g. approve many companies at once
+  app.post("/api/admin/companies/bulk", requireAdmin, async (req, res) => {
+    try {
+      const { companyIds, status, creditLimit } = req.body;
+
+      if (!Array.isArray(companyIds) || companyIds.length === 0) {
+        return res.status(400).json({ error: "companyIds must be a non-empty array" });
+      }
+
+      // Perform atomic transaction using drizzle `db.transaction`
+      const results = await db.transaction(async (tx) => {
+        const updated: any[] = [];
+
+        for (const id of companyIds) {
+          const updates: any = {};
+          if (status) updates.status = status;
+          if (creditLimit !== undefined) updates.creditLimit = creditLimit;
+
+          // Use direct update against tx for atomicity
+          const [company] = await tx.update(schema.companies).set(updates).where(schema.companies.id.equals(id)).returning();
+          if (company) {
+            await tx.insert(schema.auditLogs).values({
+              actorUserId: req.session.userId || null,
+              companyId: id,
+              action: "company_bulk_updated",
+              entityType: "company",
+              entityId: id,
+              previousValues: null,
+              newValues: JSON.stringify(updates),
+            });
+            updated.push(company);
+          }
+        }
+
+        return updated;
+      });
+
+      res.json({ updated: results });
+    } catch (error: any) {
+      console.error("Bulk update companies error:", error);
+      res.status(500).json({ error: "Failed to bulk update companies" });
+    }
+  });
+
   // Update company status (admin only)
   app.patch("/api/admin/companies/:id", requireAdmin, async (req, res) => {
     try {
@@ -1527,6 +1573,266 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Get all orders error:", error);
       res.status(500).json({ error: "Failed to get orders" });
+    }
+  });
+
+  // Stream orders as CSV (admin only)
+  app.get("/api/admin/export/orders.csv", requireAdmin, async (req, res) => {
+    try {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      const filename = `orders-${new Date().toISOString().slice(0,10)}.csv`;
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+      // Pagination for large exports
+      const pageSize = parseInt(String(req.query.pageSize || "500"), 10) || 500;
+
+      const csvEscape = (v: any) => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      };
+
+      // header
+      res.write(["orderNumber", "companyName", "companyId", "status", "paymentStatus", "total", "currency", "createdAt", "shippingState", "shippingCity", "items"].join(",") + "\n");
+
+      // Determine total rows
+      const totalOrders = (await db.select().from(schema.orders)).length;
+      res.setHeader("X-Total-Rows", String(totalOrders));
+
+      // Stream in pages
+      let offset = 0;
+      while (true) {
+        const batch = await db.select().from(schema.orders).limit(pageSize).offset(offset);
+        if (!batch || batch.length === 0) break;
+
+        for (const order of batch) {
+          const items = await storage.getOrderItems(order.id);
+          const company = await storage.getCompany(order.companyId);
+
+          let shippingState = "";
+          let shippingCity = "";
+          if (order.shippingAddressId) {
+            const [addr] = await db.select().from(schema.shippingAddresses).where(schema.shippingAddresses.id.equals(order.shippingAddressId));
+            if (addr) {
+              shippingState = addr.state || "";
+              shippingCity = addr.city || "";
+            }
+          }
+
+          const itemsSummary = items.map(i => `${i.quantity}x ${i.deviceVariantId} @ ${i.unitPrice}`).join("; ");
+
+          const row = [
+            csvEscape(order.orderNumber),
+            csvEscape(company?.name || ""),
+            csvEscape(order.companyId),
+            csvEscape(order.status),
+            csvEscape(order.paymentStatus),
+            csvEscape(order.total),
+            csvEscape(order.currency),
+            csvEscape(new Date(order.createdAt).toISOString()),
+            csvEscape(shippingState),
+            csvEscape(shippingCity),
+            csvEscape(itemsSummary),
+          ];
+
+          res.write(row.join(",") + "\n");
+        }
+
+        offset += batch.length;
+      }
+
+      res.end();
+    } catch (error: any) {
+      console.error("Export orders CSV error:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to export orders" });
+    }
+  });
+
+  // Stream inventory as CSV (admin only)
+  app.get("/api/admin/export/inventory.csv", requireAdmin, async (req, res) => {
+    try {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      const filename = `inventory-${new Date().toISOString().slice(0,10)}.csv`;
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+      // Pagination
+      const pageSize = parseInt(String(req.query.pageSize || "500"), 10) || 500;
+
+      const csvEscape = (v: any) => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      };
+
+      res.write(["modelSku", "brand", "modelName", "variantId", "storage", "color", "conditionGrade", "quantityAvailable", "minOrderQuantity", "unitPrice"].join(",") + "\n");
+
+      // Determine total rows (rough estimate)
+      const modelsCount = (await db.select().from(schema.deviceModels)).length;
+      // sum variants count
+      let totalRows = 0;
+      const allModels = await db.select().from(schema.deviceModels);
+      for (const m of allModels) {
+        const variants = await db.select().from(schema.deviceVariants).where(schema.deviceVariants.deviceModelId.equals(m.id));
+        totalRows += variants.length;
+      }
+      res.setHeader("X-Total-Rows", String(totalRows));
+
+      // Stream models + variants in pages (paginate over device_models and their variants)
+      // We'll paginate over device_models and pull variants per model to keep memory bounded.
+      const models = await db.select().from(schema.deviceModels);
+      for (const model of models) {
+        const variants = await db.select().from(schema.deviceVariants).where(schema.deviceVariants.deviceModelId.equals(model.id));
+        for (const variant of variants) {
+          const inventory = await storage.getInventoryByVariantId(variant.id);
+          const tiers = await storage.getPriceTiersByVariantId(variant.id);
+          const unitPrice = tiers && tiers.length > 0 ? tiers[0].unitPrice : "";
+
+          const row = [
+            csvEscape(model.sku),
+            csvEscape(model.brand),
+            csvEscape(model.name),
+            csvEscape(variant.id),
+            csvEscape(variant.storage),
+            csvEscape(variant.color),
+            csvEscape(variant.conditionGrade),
+            csvEscape(inventory?.quantityAvailable ?? 0),
+            csvEscape(inventory?.minOrderQuantity ?? 1),
+            csvEscape(unitPrice),
+          ];
+
+          res.write(row.join(",") + "\n");
+        }
+      }
+
+      res.end();
+    } catch (error: any) {
+      console.error("Export inventory CSV error:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to export inventory" });
+    }
+  });
+
+  // ====== ADMIN REPORTS (simple aggregates) ======
+
+  // Top SKUs by quantity sold
+  app.get("/api/admin/reports/top-skus", requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(String(req.query.limit || "20"), 10) || 20;
+      const orders = await storage.getAllOrders();
+      const skuMap = new Map();
+
+      for (const order of orders) {
+        const items = await storage.getOrderItems(order.id);
+        for (const item of items) {
+          const variant = await storage.getDeviceVariant(item.deviceVariantId);
+          if (!variant) continue;
+          const model = await storage.getDeviceModel(variant.deviceModelId);
+          const key = model?.sku || variant.id;
+          const existing = skuMap.get(key) || { sku: key, brand: model?.brand || "", name: model?.name || "", qty: 0, revenue: 0 };
+          existing.qty += item.quantity;
+          existing.revenue += (parseFloat(item.unitPrice) * item.quantity) || 0;
+          skuMap.set(key, existing);
+        }
+      }
+
+      const results = Array.from(skuMap.values()).sort((a, b) => b.qty - a.qty).slice(0, limit);
+      res.json(results);
+    } catch (error: any) {
+      console.error("Top SKUs report error:", error);
+      res.status(500).json({ error: "Failed to compute top SKUs" });
+    }
+  });
+
+  // Sales by region (by shipping address state)
+  app.get("/api/admin/reports/sales-by-region", requireAdmin, async (req, res) => {
+    try {
+      const orders = await storage.getAllOrders();
+      const byState = new Map();
+
+      for (const order of orders) {
+        let state = "unknown";
+        if (order.shippingAddressId) {
+          const [addr] = await db.select().from(schema.shippingAddresses).where(schema.shippingAddresses.id.equals(order.shippingAddressId));
+          if (addr) state = addr.state || "unknown";
+        }
+
+        const current = byState.get(state) || { state, total: 0, count: 0 };
+        current.total += parseFloat(order.total) || 0;
+        current.count += 1;
+        byState.set(state, current);
+      }
+
+      res.json(Array.from(byState.values()).sort((a, b) => b.total - a.total));
+    } catch (error: any) {
+      console.error("Sales by region report error:", error);
+      res.status(500).json({ error: "Failed to compute sales by region" });
+    }
+  });
+
+  // Companies by status
+  app.get("/api/admin/reports/companies-status", requireAdmin, async (req, res) => {
+    try {
+      const companies = await storage.getAllCompanies();
+      const map = new Map();
+      for (const c of companies) {
+        const key = c.status || "unknown";
+        map.set(key, (map.get(key) || 0) + 1);
+      }
+      res.json(Array.from(map.entries()).map(([status, count]) => ({ status, count })));
+    } catch (error: any) {
+      console.error("Companies status report error:", error);
+      res.status(500).json({ error: "Failed to compute companies status" });
+    }
+  });
+
+  // Top suppliers by revenue (companies that act as suppliers)
+  app.get("/api/admin/reports/top-suppliers", requireAdmin, async (req, res) => {
+    try {
+      // Aggregate order totals by company
+      const orders = await storage.getAllOrders();
+      const map = new Map();
+      for (const o of orders) {
+        const company = await storage.getCompany(o.companyId);
+        const key = company?.id || o.companyId;
+        const entry = map.get(key) || { companyId: key, name: company?.name || "Unknown", revenue: 0, orders: 0 };
+        entry.revenue += parseFloat(o.total) || 0;
+        entry.orders += 1;
+        map.set(key, entry);
+      }
+      const results = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 50);
+      res.json(results);
+    } catch (error: any) {
+      console.error("Top suppliers report error:", error);
+      res.status(500).json({ error: "Failed to compute top suppliers" });
+    }
+  });
+
+  // Sales time series (group by month)
+  app.get("/api/admin/reports/sales-timeseries", requireAdmin, async (req, res) => {
+    try {
+      const { start, end } = req.query;
+      const orders = await storage.getAllOrders();
+      const byMonth = new Map();
+
+      for (const o of orders) {
+        const date = new Date(o.createdAt);
+        const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+        const entry = byMonth.get(month) || { month, total: 0, count: 0 };
+        entry.total += parseFloat(o.total) || 0;
+        entry.count += 1;
+        byMonth.set(month, entry);
+      }
+
+      const series = Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month));
+      res.json(series);
+    } catch (error: any) {
+      console.error("Sales timeseries error:", error);
+      res.status(500).json({ error: "Failed to compute sales timeseries" });
     }
   });
 

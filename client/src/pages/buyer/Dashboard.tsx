@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
-import { Package, ShoppingCart, FileText, Heart, TrendingUp, Clock } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Package, ShoppingCart, FileText, Heart, TrendingUp, Clock, LogOut } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 
@@ -12,6 +14,20 @@ export default function BuyerDashboard() {
     queryKey: ["/api/orders"],
   });
   const { data: cart } = useQuery<any>({ queryKey: ["/api/cart"] });
+  const queryClient = useQueryClient();
+  const [location, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+      queryClient.clear();
+      setLocation("/login");
+      toast({ title: "Logged out", description: "You have been logged out successfully" });
+    } catch (err) {
+      toast({ title: "Error", description: "Logout failed", variant: "destructive" });
+    }
+  };
 
   const stats = [
     {
@@ -46,9 +62,16 @@ export default function BuyerDashboard() {
       <main className="flex-1 bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="space-y-8">
-            <div className="text-center sm:text-left">
-              <h1 className="text-3xl font-semibold tracking-tight">Welcome back, {user?.name}</h1>
-              <p className="text-muted-foreground mt-1">Here's what's happening with your account</p>
+            <div className="flex items-start justify-between">
+              <div className="text-center sm:text-left">
+                <h1 className="text-3xl font-semibold tracking-tight">Welcome back, {user?.name}</h1>
+                <p className="text-muted-foreground mt-1">Here's what's happening with your account</p>
+              </div>
+              <div className="ml-4">
+                <Button onClick={handleLogout} variant="outline" data-testid="button-logout-dashboard">
+                  <LogOut className="mr-2 h-4 w-4" /> Logout
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

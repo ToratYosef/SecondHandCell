@@ -79,6 +79,21 @@ export default function SavedLists() {
     createListMutation.mutate(listName);
   };
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingListId, setDeletingListId] = useState<string | null>(null);
+
+  const confirmDeleteList = (id: string) => {
+    setDeletingListId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const performDelete = () => {
+    if (!deletingListId) return;
+    deleteListMutation.mutate(deletingListId);
+    setDeleteDialogOpen(false);
+    setDeletingListId(null);
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <UnifiedHeader />
@@ -116,11 +131,7 @@ export default function SavedLists() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => {
-                      if (confirm(`Delete "${list.name}"?`)) {
-                        deleteListMutation.mutate(list.id);
-                      }
-                    }}
+                    onClick={() => confirmDeleteList(list.id)}
                     disabled={deleteListMutation.isPending}
                     data-testid={`button-delete-${list.id}`}
                   >
@@ -192,6 +203,18 @@ export default function SavedLists() {
               {createListMutation.isPending ? "Creating..." : "Create List"}
             </Button>
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Saved List</DialogTitle>
+                <DialogDescription>Are you sure you want to delete this saved list? This action cannot be undone.</DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                <Button onClick={performDelete} disabled={deleteListMutation.isPending}>Delete</Button>
+              </div>
             </DialogContent>
           </Dialog>
           </div>

@@ -216,9 +216,8 @@ export default function Inventory() {
   };
 
   const handleDelete = (variant: any) => {
-    if (confirm(`Delete ${variant.device.marketingName} (${variant.storage} ${variant.color})?`)) {
-      deleteVariantMutation.mutate(variant.id);
-    }
+    setDeletingVariant(variant);
+    setDeleteVariantDialogOpen(true);
   };
 
   const allVariants = devices?.flatMap((device: any) =>
@@ -262,6 +261,16 @@ export default function Inventory() {
   const lowStockVariants = allVariants.filter((v: any) => 
     v.inventory && v.inventory.quantityAvailable < 20
   );
+
+  const [deleteVariantDialogOpen, setDeleteVariantDialogOpen] = useState(false);
+  const [deletingVariant, setDeletingVariant] = useState<any | null>(null);
+
+  const performDeleteVariant = () => {
+    if (!deletingVariant) return;
+    deleteVariantMutation.mutate(deletingVariant.id);
+    setDeleteVariantDialogOpen(false);
+    setDeletingVariant(null);
+  };
 
   if (isLoading) {
     return (
@@ -709,6 +718,20 @@ export default function Inventory() {
             <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
               Cancel
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deleteVariantDialogOpen} onOpenChange={setDeleteVariantDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Variant</DialogTitle>
+          </DialogHeader>
+          <div>
+            <p>Are you sure you want to delete {deletingVariant ? `${deletingVariant.device.marketingName} (${deletingVariant.storage} ${deletingVariant.color})` : "this variant"}?</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteVariantDialogOpen(false)}>Cancel</Button>
+            <Button onClick={performDeleteVariant} disabled={deleteVariantMutation.isPending}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -47,6 +47,7 @@ import AdminQuotes from "@/pages/admin/Quotes";
 import AdminOrders from "@/pages/admin/Orders";
 import AdminUsers from "@/pages/admin/Users";
 import AdminSettings from "@/pages/admin/Settings";
+import AdminReports from "@/pages/admin/Reports";
 
 function Router() {
   return (
@@ -233,6 +234,15 @@ function Router() {
           <ProtectedRoute requiredRole="admin">
             <AdminLayout>
               <AdminSettings />
+            </AdminLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/admin/reports">
+        {() => (
+          <ProtectedRoute requiredRole="admin">
+            <AdminLayout>
+              <AdminReports />
             </AdminLayout>
           </ProtectedRoute>
         )}

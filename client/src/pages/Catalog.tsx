@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PublicHeader } from "@/components/PublicHeader";
 import { PublicFooter } from "@/components/PublicFooter";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Lock, Smartphone, Search, Loader2, Plus, Minus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -46,18 +46,83 @@ export default function Catalog() {
     queryKey: ["/api/public/categories"],
   });
 
-  // Filter devices
-  const filteredDevices = devices?.filter((device) => {
+  // Current authenticated user (if any) - used to allow admins to see pricing
+  const { data: me } = useQuery({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (err) {
+        return null;
+      }
+    },
+    retry: false,
+  });
+
+  const canSeePricing = !!me && (me.role === "buyer" || me.role === "admin" || me.role === "super_admin");
+
+  // Fetch richer catalog for authenticated buyers/admins, otherwise public catalog
+  const { data: devicesFull, isLoading: devicesFullLoading } = useQuery({
+    queryKey: ["/api/catalog", canSeePricing],
+    queryFn: async () => {
+      try {
+        const endpoint = canSeePricing ? "/api/catalog" : "/api/public/catalog";
+        const res = await fetch(endpoint);
+        if (!res.ok) throw new Error("Failed to load catalog");
+        return await res.json();
+      } catch (err) {
+        return null;
+      }
+    },
+  });
+
+  // Prefer the full devices when available
+  const effectiveDevices: any[] = devicesFull || devices || [];
+  const effectiveDevicesLoading = devicesFullLoading || devicesLoading;
+
+  const [location] = useLocation();
+
+  // Read `?category=` query param (slug or id) and set selectedCategory accordingly
+  useEffect(() => {
+    try {
+      const query = (location && location.includes("?") && location.split("?")[1]) || window?.location?.search?.replace(/^\?/, "") || "";
+      const params = new URLSearchParams(query);
+      const categoryParam = params.get("category");
+      if (!categoryParam) return;
+
+      // If categories are not loaded yet, wait until they load
+      if (!categories || categories.length === 0) return;
+
+      // Try to find by slug first, then by id. If not found and value is 'all', clear filter.
+      const foundBySlug = categories.find((c) => c.slug === categoryParam);
+      const foundById = categories.find((c) => c.id === categoryParam);
+
+      if (foundBySlug) {
+        setSelectedCategory(foundBySlug.id);
+      } else if (foundById) {
+        setSelectedCategory(foundById.id);
+      } else if (categoryParam === "all") {
+        setSelectedCategory("all");
+      }
+    } catch (err) {
+      // ignore parse errors
+    }
+  }, [location, categories]);
+
+  // Filter devices (from effectiveDevices)
+  const filteredDevices = effectiveDevices?.filter((device: any) => {
     const matchesSearch = 
-      device.marketingName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.brand.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || device.categoryId === selectedCategory;
+      (device.marketingName || device.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (device.brand || "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || device.categoryId === selectedCategory || device.categoryId === selectedCategory;
     const matchesBrand = selectedBrand === "all" || device.brand === selectedBrand;
     return matchesSearch && matchesCategory && matchesBrand;
   }) || [];
 
   // Get unique brands
-  const brands = Array.from(new Set(devices?.map((d) => d.brand) || [])).sort();
+  const brands = Array.from(new Set((effectiveDevices || []).map((d: any) => d.brand))).sort();
 
   // Quantity management
   const getQuantity = (deviceId: string) => quantities[deviceId] || 1;
@@ -95,8 +160,9 @@ export default function Catalog() {
           <div className="container px-4 sm:px-6 lg:px-8">
             {/* Filters */}
             <div className="mb-8 space-y-4">
-              {/* Login Notice */}
-              <Card className="border-primary/20 bg-primary/5">
+              {/* Login Notice (only show when user cannot see pricing) */}
+              {!canSeePricing && (
+                <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
                   <div className="flex items-center gap-3">
                     <Lock className="h-5 w-5 text-primary" />
@@ -108,7 +174,8 @@ export default function Catalog() {
                     <Link href="/login?redirect=/buyer/catalog">Login</Link>
                   </Button>
                 </CardContent>
-              </Card>
+                </Card>
+              )}
 
               {/* Search and Filters */}
               <div className="flex flex-wrap gap-4">
@@ -154,19 +221,19 @@ export default function Catalog() {
               </div>
 
               {/* Results Count */}
-              {!devicesLoading && (
+              {!effectiveDevicesLoading && (
                 <p className="text-sm text-muted-foreground">
-                  Showing {filteredDevices.length} of {devices?.length || 0} devices
+                  Showing {filteredDevices.length} of {effectiveDevices?.length || 0} devices
                 </p>
               )}
             </div>
 
             {/* Loading State */}
-            {devicesLoading && (
+            {effectiveDevicesLoading && (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <Card key={i}>
-                    <Skeleton className="aspect-[4/3] w-full" />
+                  <Card key={i} className="rounded-lg shadow-sm">
+                    <Skeleton className="aspect-[4/3] w-full rounded-t-lg" />
                     <CardHeader>
                       <Skeleton className="h-6 w-20 mb-2" />
                       <Skeleton className="h-7 w-3/4" />
@@ -181,10 +248,10 @@ export default function Catalog() {
             )}
 
             {/* Device Grid */}
-            {!devicesLoading && filteredDevices.length > 0 && (
+            {!effectiveDevicesLoading && filteredDevices.length > 0 && (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredDevices.map((device) => (
-                  <Card key={device.id} className="hover-elevate" data-testid={`card-device-${device.id}`}>
+                  {filteredDevices.map((device) => (
+                    <Card key={device.id} className="hover-elevate rounded-lg shadow-md overflow-hidden" data-testid={`card-device-${device.id}`}>
                     <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
                       {device.imageUrl ? (
                         <img 
@@ -205,7 +272,7 @@ export default function Catalog() {
                           </Badge>
                         )}
                       </div>
-                      <CardTitle className="text-lg">
+                      <CardTitle className="text-lg md:text-xl">
                         {device.brand} {device.marketingName}
                       </CardTitle>
                       {device.description && (
@@ -280,9 +347,15 @@ export default function Catalog() {
                         </div>
                       </div>
                       
-                      <Button variant="outline" className="mt-3 w-full" asChild data-testid={`button-view-${device.id}`}>
-                        <Link href="/login?redirect=/buyer/catalog">Sign In to View Pricing</Link>
-                      </Button>
+                      {canSeePricing ? (
+                        <Button variant="outline" className="mt-3 w-full" asChild data-testid={`button-view-${device.id}`}>
+                          <Link href={`/catalog/models/${device.slug || device.id}`}>View Pricing</Link>
+                        </Button>
+                      ) : (
+                        <Button variant="outline" className="mt-3 w-full" asChild data-testid={`button-view-${device.id}`}>
+                          <Link href="/login?redirect=/buyer/catalog">Sign In to View Pricing</Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -290,7 +363,7 @@ export default function Catalog() {
             )}
 
             {/* Empty State */}
-            {!devicesLoading && filteredDevices.length === 0 && devices && devices.length > 0 && (
+            {!effectiveDevicesLoading && filteredDevices.length === 0 && effectiveDevices && effectiveDevices.length > 0 && (
               <div className="py-16 text-center">
                 <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-lg font-medium mb-2">No devices found</p>
@@ -299,7 +372,7 @@ export default function Catalog() {
             )}
 
             {/* No Devices at All */}
-            {!devicesLoading && devices && devices.length === 0 && (
+            {!effectiveDevicesLoading && effectiveDevices && effectiveDevices.length === 0 && (
               <div className="py-16 text-center">
                 <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-lg font-medium mb-2">No devices available</p>

@@ -13,28 +13,31 @@ export function PublicHeader() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
-          <BrandLogo />
-        </Link>
-
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex md:flex-1 md:items-center md:justify-center md:gap-6">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              data-testid={`link-${link.label.toLowerCase()}`}
-            >
-              {link.label}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-3 h-20 items-center gap-4">
+          {/* Logo (left) */}
+          <div className="col-start-1 flex items-center">
+            <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
+              <BrandLogo />
             </Link>
-          ))}
-        </nav>
+          </div>
 
-        {/* Desktop Actions */}
-        <div className="hidden md:flex md:items-center md:gap-3">
+          {/* Desktop Navigation (center) */}
+          <div className="col-start-2 hidden md:flex md:items-center md:justify-center md:gap-6">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                data-testid={`link-${link.label.toLowerCase()}`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Desktop Actions (right) */}
+          <div className="col-start-3 hidden md:flex md:items-center md:justify-end md:gap-3">
           <Button variant="ghost" asChild data-testid="button-login">
             <Link href="/login">Login</Link>
           </Button>
@@ -80,8 +83,8 @@ export function PublicHeader() {
 
       {/* Trust Indicator */}
       <div className="border-t bg-muted/50">
-        <div className="container px-4 py-2 text-center sm:px-6 lg:px-8">
-          <p className="text-xs text-muted-foreground">
+        <div className="container px-4 py-3 text-center sm:px-6 lg:px-8">
+          <p className="text-sm text-muted-foreground">
             Trusted by 2,000+ wholesale buyers
           </p>
         </div>

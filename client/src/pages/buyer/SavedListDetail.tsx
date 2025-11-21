@@ -8,6 +8,7 @@ import { ArrowLeft, ShoppingCart, Trash2 } from "lucide-react";
 import type { SavedList, SavedListItem } from "@shared/schema";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface SavedListWithItems extends SavedList {
   items: Array<SavedListItem & {
@@ -108,6 +109,15 @@ export default function SavedListDetail({ params }: { params: { id: string } }) 
     },
   });
 
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+    const confirmDelete = () => setDeleteDialogOpen(true);
+
+    const performDelete = () => {
+      deleteListMutation.mutate();
+      setDeleteDialogOpen(false);
+    };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -127,6 +137,18 @@ export default function SavedListDetail({ params }: { params: { id: string } }) 
             </div>
           </div>
         </main>
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete Saved List</DialogTitle>
+                  <DialogDescription>Are you sure you want to delete this saved list? This action cannot be undone.</DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={performDelete} disabled={deleteListMutation.isPending}>Delete</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
         <PublicFooter />
       </div>
     );
@@ -180,11 +202,7 @@ export default function SavedListDetail({ params }: { params: { id: string } }) 
               <div className="flex gap-2 flex-wrap">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    if (confirm(`Delete "${list.name}"?`)) {
-                      deleteListMutation.mutate();
-                    }
-                  }}
+                  onClick={() => confirmDelete()}
                   disabled={deleteListMutation.isPending}
                   data-testid="button-delete-list"
                 >

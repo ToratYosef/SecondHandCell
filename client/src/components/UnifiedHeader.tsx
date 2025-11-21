@@ -36,28 +36,32 @@ export function UnifiedHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-7xl">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
-            <BrandLogo />
-          </Link>
+        <div className="grid grid-cols-3 h-20 items-center px-4 sm:px-6 lg:px-8">
+          {/* Logo (left) */}
+          <div className="col-start-1 flex items-center">
+            <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
+              <BrandLogo />
+            </Link>
+          </div>
 
-          {/* Desktop Navigation - Centered */}
-          <nav className="hidden md:flex md:items-center md:gap-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                data-testid={`link-${link.label.toLowerCase()}`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+          {/* Desktop Navigation - Center */}
+          <div className="col-start-2 hidden md:flex md:items-center md:justify-center">
+            <nav className="flex items-center gap-6">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  data-testid={`link-${link.label.toLowerCase()}`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
 
-          {/* Desktop Actions */}
-          <div className="hidden md:flex md:items-center md:gap-3">
+          {/* Desktop Actions (right) */}
+          <div className="col-start-3 hidden md:flex md:items-center md:justify-end md:gap-3">
             {isAuthenticated ? (
               <>
                 <Button variant="ghost" asChild data-testid="button-my-account">
@@ -146,8 +150,8 @@ export function UnifiedHeader() {
 
       {/* Trust Indicator */}
       <div className="border-t bg-muted/50">
-        <div className="mx-auto max-w-7xl px-4 py-2 text-center sm:px-6 lg:px-8">
-          <p className="text-xs text-muted-foreground">
+        <div className="mx-auto max-w-7xl px-4 py-3 text-center sm:px-6 lg:px-8">
+          <p className="text-sm text-muted-foreground">
             Trusted by 2,000+ wholesale buyers
           </p>
         </div>

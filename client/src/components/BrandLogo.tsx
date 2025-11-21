@@ -16,11 +16,11 @@ export function BrandLogo({ className, imageClassName, showTextFallback = true }
         <img
           src={logoUrl}
           alt="Company logo"
-          className={cn("h-9 w-auto max-h-10 object-contain", imageClassName)}
+          className={cn("h-12 w-auto max-h-14 object-contain", imageClassName)}
         />
       ) : (
         showTextFallback && (
-          <div className="text-lg font-bold tracking-tight">
+          <div className="text-xl font-bold tracking-tight">
             <span className="text-primary">SecondHand</span>
             <span className="text-muted-foreground">(Whole)</span>
             <span className="text-primary">Cell</span>
