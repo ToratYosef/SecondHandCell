@@ -16,7 +16,18 @@ import { useToast } from "@/hooks/use-toast";
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [editingVariant, setEditingVariant] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    storage: "",
+    color: "",
+    conditionGrade: "",
+    networkLockStatus: "",
+    unitPrice: "0",
+    quantity: "0",
+    minOrderQuantity: "1",
+  });
   const [importPayload, setImportPayload] = useState(`[
   {
     "brand": "Apple",
@@ -112,12 +123,12 @@ export default function Inventory() {
 
   const updateVariantMutation = useMutation({
     mutationFn: async ({ id, payload }: { id: string; payload: any }) => {
-      return await apiRequest("PATCH", `/api/admin/device-variants/${id}", payload);
+      return await apiRequest("PATCH", `/api/admin/device-variants/${id}`, payload);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
       toast({ title: "Variant updated", description: "Inventory details saved" });
-      setEditDialogOpen(false);
+      setAddDialogOpen(false);
     },
     onError: (error: any) => {
       toast({
@@ -167,13 +178,13 @@ export default function Inventory() {
   const openEditDialog = (variant: any) => {
     setEditingVariant(variant);
     setEditForm({
-      storage: variant.storage,
-      color: variant.color,
-      conditionGrade: variant.conditionGrade,
-      networkLockStatus: variant.networkLockStatus,
-      unitPrice: String(variant.unitPrice || "0"),
-      quantity: String(variant.inventory?.quantityAvailable ?? "0"),
-      minOrderQuantity: String(variant.inventory?.minOrderQuantity ?? "1"),
+      storage: variant.storage || "",
+      color: variant.color || "",
+      conditionGrade: variant.conditionGrade || "",
+      networkLockStatus: variant.networkLockStatus || "",
+      unitPrice: typeof variant.unitPrice === "number" ? variant.unitPrice.toString() : "0",
+      quantity: variant.inventory?.quantityAvailable?.toString() || "0",
+      minOrderQuantity: variant.inventory?.minOrderQuantity?.toString() || "1",
     });
     setEditDialogOpen(true);
   };
@@ -698,12 +709,10 @@ export default function Inventory() {
             <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleImportSubmit} disabled={importDevicesMutation.isPending}>
-              {importDevicesMutation.isPending ? "Importing..." : "Start Import"}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
