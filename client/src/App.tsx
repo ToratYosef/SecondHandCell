@@ -19,6 +19,8 @@ import Privacy from "@/pages/Privacy";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import RegisterThanks from "@/pages/RegisterThanks";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 
 // Buyer Portal Pages
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -66,6 +68,8 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/register/thanks" component={RegisterThanks} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       
       {/* Buyer Portal Routes */}
       <Route path="/buyer/dashboard">

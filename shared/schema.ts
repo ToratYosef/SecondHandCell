@@ -35,6 +35,8 @@ export const users = sqliteTable("users", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
   lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: integer("reset_token_expiry", { mode: "timestamp" }),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
