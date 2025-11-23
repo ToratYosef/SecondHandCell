@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -255,8 +255,16 @@ function Router() {
 }
 
 function App() {
+  const [, setLocation] = useLocation();
+
   useEffect(() => {
     if (typeof window !== "undefined") {
+      const redirectPath = sessionStorage.getItem("spaRedirect");
+      if (redirectPath) {
+        sessionStorage.removeItem("spaRedirect");
+        setLocation(redirectPath);
+      }
+
       const theme = localStorage.getItem("theme");
       if (theme === "dark") {
         document.documentElement.classList.add("dark");
@@ -264,7 +272,7 @@ function App() {
         document.documentElement.classList.remove("dark");
       }
     }
-  }, []);
+  }, [setLocation]);
 
   return (
     <QueryClientProvider client={queryClient}>

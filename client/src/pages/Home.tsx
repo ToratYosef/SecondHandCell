@@ -5,6 +5,7 @@ import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { CheckCircle2, TrendingUp, Truck, Users, Smartphone, Tablet, Laptop, Watch } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import warehouseHeroBackground from "@assets/generated_images/Warehouse_hero_background_image_8f8c1570.png";
 
 export default function Home() {
   const { data: user } = useQuery({
@@ -109,18 +110,29 @@ export default function Home() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-slate-950">
-          <div
-            className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.12),transparent_35%),radial-gradient(circle_at_80%_0,rgba(129,140,248,0.14),transparent_30%),radial-gradient(circle_at_50%_80%,rgba(16,185,129,0.12),transparent_35%)]"
-            aria-hidden
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-black/80" />
-          
-          <div className="relative z-10 mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
-            <h1 className="mb-6 text-5xl font-bold tracking-tight text-white lg:text-6xl" data-testid="text-hero-headline">
+          <div className="absolute inset-0">
+            <img
+              src={warehouseHeroBackground}
+              alt="Rows of refurbished devices organized in a warehouse"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-950/70 to-black/85" aria-hidden />
+            <div
+              className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.12),transparent_35%),radial-gradient(circle_at_80%_0,rgba(129,140,248,0.14),transparent_30%),radial-gradient(circle_at_50%_80%,rgba(16,185,129,0.12),transparent_35%)] opacity-80"
+              aria-hidden
+            />
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 to-transparent" aria-hidden />
+          </div>
+
+          <div className="relative z-10 mx-auto max-w-6xl px-4 py-24 text-center sm:px-6 lg:px-8">
+            <p className="mb-4 inline-flex rounded-full bg-white/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.2em] text-white/90 backdrop-blur-sm">
+              Trusted wholesale marketplace
+            </p>
+            <h1 className="mb-6 text-5xl font-bold tracking-tight text-white drop-shadow-lg lg:text-6xl" data-testid="text-hero-headline">
               Wholesale Devices, Done Right.
             </h1>
-            <p className="mx-auto mb-8 max-w-2xl text-xl leading-relaxed text-white/90" data-testid="text-hero-subheading">
-              SecondHand(Whole)Cell connects serious buyers with reliably graded, competitively priced used devices, ready to ship in bulk.
+            <p className="mx-auto mb-8 max-w-3xl text-xl leading-relaxed text-white/90" data-testid="text-hero-subheading">
+              SecondHand(Whole)Cell connects serious buyers with reliably graded, competitively priced used devices, ready to ship in bulk from secure U.S. warehouses.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button size="lg" asChild className="bg-primary text-primary-foreground hover-elevate active-elevate-2" data-testid="button-browse-catalog">
@@ -128,17 +140,20 @@ export default function Home() {
                   {isAuthenticated ? "See Catalog" : "Sign In"}
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild className="border-white/20 bg-white/10 text-white backdrop-blur-sm hover-elevate active-elevate-2" data-testid="button-apply-account">
+              <Button size="lg" variant="outline" asChild className="border-white/30 bg-white/10 text-white backdrop-blur-sm hover-elevate active-elevate-2" data-testid="button-apply-account">
                 <Link href={isAuthenticated ? "/buyer/dashboard" : "/register"}>
                   {isAuthenticated ? "Go to Dashboard" : "Apply for Wholesale Account"}
                 </Link>
               </Button>
             </div>
-            
+
             {/* Scroll Indicator */}
-            <div className="mt-16 animate-bounce">
-              <div className="mx-auto h-10 w-6 rounded-full border-2 border-white/30">
-                <div className="mt-2 h-2 w-2 mx-auto rounded-full bg-white/50" />
+            <div className="mt-16 flex flex-col items-center gap-3 text-white/70">
+              <span className="text-sm font-medium uppercase tracking-[0.25em]">Explore</span>
+              <div className="animate-bounce">
+                <div className="mx-auto h-10 w-6 rounded-full border-2 border-white/40">
+                  <div className="mt-2 h-2 w-2 mx-auto rounded-full bg-white/70" />
+                </div>
               </div>
             </div>
           </div>
