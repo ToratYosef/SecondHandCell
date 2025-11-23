@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, Search, AlertTriangle, Upload, Pencil, Trash2, Plus, Minus, SlidersHorizontal, RefreshCw } from "lucide-react";
+import { Package, Search, AlertTriangle, Upload, Pencil, Trash2, Plus, Minus, SlidersHorizontal, RefreshCw, FileText, TrendingUp, TrendingDown } from "lucide-react";
 import { ConditionBadge } from "@/components/ConditionBadge";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -363,9 +363,10 @@ export default function Inventory() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Inventory Management</h1>
-          <p className="text-muted-foreground mt-1">
-            {allVariants.length} total variants • {lowStockVariants.length} low stock
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Inventory Management</h1>
+          <p className="text-muted-foreground mt-1 text-lg">
+            <span className="font-semibold text-foreground">{allVariants.length}</span> total variants • 
+            <span className="font-semibold text-yellow-600">{lowStockVariants.length}</span> low stock alerts
           </p>
         </div>
         <div className="flex gap-2">

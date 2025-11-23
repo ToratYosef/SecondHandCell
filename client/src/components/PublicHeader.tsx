@@ -38,16 +38,16 @@ export function PublicHeader() {
 
           {/* Desktop Actions (right) */}
           <div className="col-start-3 hidden md:flex md:items-center md:justify-end md:gap-3">
-          <Button variant="ghost" asChild data-testid="button-login">
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button asChild data-testid="button-apply">
-            <Link href="/register">Apply Now</Link>
-          </Button>
-        </div>
+            <Button variant="ghost" asChild data-testid="button-login">
+              <Link href="/login">Login</Link>
+            </Button>
+            <Button asChild data-testid="button-apply">
+              <Link href="/register">Apply Now</Link>
+            </Button>
+          </div>
 
-        {/* Mobile Menu */}
-        <div className="flex flex-1 items-center justify-end md:hidden">
+          {/* Mobile Menu */}
+          <div className="flex flex-1 items-center justify-end md:hidden">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" data-testid="button-menu">
@@ -80,6 +80,7 @@ export function PublicHeader() {
           </Sheet>
         </div>
       </div>
+    </div>
 
       {/* Trust Indicator */}
       <div className="border-t bg-muted/50">
