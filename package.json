@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "seed": "NODE_ENV=development tsx server/seed.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "build:api": "esbuild server-api-only.js --platform=node --packages=external --bundle --format=esm --outfile=dist/api-server.js",
+    "build": "vite build && npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:api": "npx esbuild server-api-only.js --platform=node --packages=external --bundle --format=esm --outfile=dist/api-server.js",
     "start": "NODE_ENV=production node dist/index.js",
     "start:api": "NODE_ENV=production node dist/api-server.js",
     "check": "tsc",
