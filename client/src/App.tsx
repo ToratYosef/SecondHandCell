@@ -16,7 +16,7 @@ import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 
 // Auth Pages
-import Login from "@/pages/Login";
+import Login from "@/pages/LoginNew";
 import Register from "@/pages/Register";
 import RegisterThanks from "@/pages/RegisterThanks";
 import ForgotPassword from "@/pages/ForgotPassword";

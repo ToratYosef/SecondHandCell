@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Package, Search, AlertTriangle, Upload, Pencil, Trash2, Plus, Minus, SlidersHorizontal, RefreshCw, FileText, TrendingUp, TrendingDown } from "lucide-react";
 import { ConditionBadge } from "@/components/ConditionBadge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
