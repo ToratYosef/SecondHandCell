@@ -96,9 +96,10 @@ const requireAdmin = async (req: Request, res: Response, next: NextFunction) => 
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const isProduction = process.env.NODE_ENV === "production";
   // Configure session middleware
   const sessionSecret = process.env.SESSION_SECRET ||
-    (process.env.NODE_ENV === 'production'
+    (isProduction
       ? (() => { throw new Error('SESSION_SECRET must be set in production'); })()
       : 'dev-secret-only-for-local-development');
 
@@ -112,9 +113,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }));

@@ -2,14 +2,43 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
+import { apiFetch } from "@/lib/api";
 
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f7f", "#8fd3ff"];
 
 export default function Reports() {
-  const { data: topSkus } = useQuery({ queryKey: ["/api/admin/reports/top-skus"], queryFn: async () => { const res = await fetch('/api/admin/reports/top-skus'); return res.ok ? res.json() : []; }, retry: false });
-  const { data: suppliers } = useQuery({ queryKey: ["/api/admin/reports/top-suppliers"], queryFn: async () => { const res = await fetch('/api/admin/reports/top-suppliers'); return res.ok ? res.json() : []; }, retry: false });
-  const { data: byRegion } = useQuery({ queryKey: ["/api/admin/reports/sales-by-region"], queryFn: async () => { const res = await fetch('/api/admin/reports/sales-by-region'); return res.ok ? res.json() : []; }, retry: false });
-  const { data: timeseries } = useQuery({ queryKey: ["/api/admin/reports/sales-timeseries"], queryFn: async () => { const res = await fetch('/api/admin/reports/sales-timeseries'); return res.ok ? res.json() : []; }, retry: false });
+  const { data: topSkus } = useQuery({
+    queryKey: ["/api/admin/reports/top-skus"],
+    queryFn: async () => {
+      const res = await apiFetch('/api/admin/reports/top-skus');
+      return res.ok ? res.json() : [];
+    },
+    retry: false,
+  });
+  const { data: suppliers } = useQuery({
+    queryKey: ["/api/admin/reports/top-suppliers"],
+    queryFn: async () => {
+      const res = await apiFetch('/api/admin/reports/top-suppliers');
+      return res.ok ? res.json() : [];
+    },
+    retry: false,
+  });
+  const { data: byRegion } = useQuery({
+    queryKey: ["/api/admin/reports/sales-by-region"],
+    queryFn: async () => {
+      const res = await apiFetch('/api/admin/reports/sales-by-region');
+      return res.ok ? res.json() : [];
+    },
+    retry: false,
+  });
+  const { data: timeseries } = useQuery({
+    queryKey: ["/api/admin/reports/sales-timeseries"],
+    queryFn: async () => {
+      const res = await apiFetch('/api/admin/reports/sales-timeseries');
+      return res.ok ? res.json() : [];
+    },
+    retry: false,
+  });
 
   const monthly = useMemo(() => {
     if (!timeseries) return [];

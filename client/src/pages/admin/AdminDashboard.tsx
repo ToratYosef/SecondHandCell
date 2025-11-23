@@ -8,6 +8,7 @@ import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminDashboard() {
   const { data: companies } = useQuery({
@@ -110,7 +111,7 @@ export default function AdminDashboard() {
   const exportOrdersCsv = async () => {
     try {
       setExporting({ type: "orders", inProgress: true, total: null });
-      const res = await fetch("/api/admin/export/orders.csv?pageSize=500");
+      const res = await apiFetch("/api/admin/export/orders.csv?pageSize=500");
       if (!res.ok) throw new Error("Failed to fetch CSV");
       const total = res.headers.get("X-Total-Rows");
       setExporting({ type: "orders", inProgress: true, total: total ? parseInt(total, 10) : null });
@@ -134,7 +135,7 @@ export default function AdminDashboard() {
   const exportInventoryCsv = async () => {
     try {
       setExporting({ type: "inventory", inProgress: true, total: null });
-      const res = await fetch("/api/admin/export/inventory.csv?pageSize=500");
+      const res = await apiFetch("/api/admin/export/inventory.csv?pageSize=500");
       if (!res.ok) throw new Error("Failed to fetch CSV");
       const total = res.headers.get("X-Total-Rows");
       setExporting({ type: "inventory", inProgress: true, total: total ? parseInt(total, 10) : null });

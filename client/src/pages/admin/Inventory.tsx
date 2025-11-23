@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Inventory() {
@@ -333,7 +334,7 @@ export default function Inventory() {
   const exportInventory = async () => {
     try {
       // reuse the admin export endpoint
-      const res = await fetch('/api/admin/export/inventory.csv?pageSize=500');
+      const res = await apiFetch('/api/admin/export/inventory.csv?pageSize=500');
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

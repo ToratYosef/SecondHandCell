@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiFetch } from "@/lib/api";
 
 interface PublicDevice {
   id: string;
@@ -69,7 +70,7 @@ export default function Catalog() {
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await apiFetch("/api/auth/me");
         if (!res.ok) return null;
         return await res.json();
       } catch (err) {
@@ -87,7 +88,7 @@ export default function Catalog() {
     queryFn: async () => {
       try {
         const endpoint = canSeePricing ? "/api/catalog" : "/api/public/catalog";
-        const res = await fetch(endpoint);
+        const res = await apiFetch(endpoint);
         if (!res.ok) throw new Error("Failed to load catalog");
         return await res.json();
       } catch (err) {
