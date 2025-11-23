@@ -262,6 +262,64 @@ export default function Inventory() {
     v.inventory && v.inventory.quantityAvailable < 20
   );
 
+  // Stock List UI state
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+
+  // Modal state for Buy / Offer
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [modalVariant, setModalVariant] = useState<any | null>(null);
+  const [modalQty, setModalQty] = useState(1);
+  const [offerMode, setOfferMode] = useState(false);
+  const [offerPrice, setOfferPrice] = useState<string>("");
+
+  // Update lastUpdated when devices change
+  useEffect(() => {
+    if (devices) setLastUpdated(new Date());
+  }, [devices]);
+
+  const toggleGroup = (key: string) => setExpandedGroups((s) => ({ ...s, [key]: !s[key] }));
+
+  // Group variants by device title (brand + marketingName + storage)
+  const groups = allVariants.reduce((acc: any, v: any) => {
+    const title = `${v.device.brand} ${v.device.marketingName} ${v.storage}`;
+    if (!acc[title]) acc[title] = [];
+    acc[title].push(v);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const groupKeys = Object.keys(groups).sort();
+  const totalResults = groupKeys.length;
+  const pagedKeys = groupKeys.slice((page - 1) * pageSize, page * pageSize);
+
+  const openProductModal = (variant: any) => {
+    setModalVariant(variant);
+    setModalQty(1);
+    setOfferMode(false);
+    setOfferPrice("");
+    setProductModalOpen(true);
+  };
+
+  const addToCart = async () => {
+    if (!modalVariant) return;
+    try {
+      await apiRequest("POST", "/api/cart/items", { deviceVariantId: modalVariant.id, quantity: modalQty });
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+      toast({ title: "Added", description: "Item added to cart" });
+      setProductModalOpen(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Failed to add to cart", variant: "destructive" });
+    }
+  };
+
+  const submitOffer = async () => {
+    // Placeholder: offers are client-side only for now
+    toast({ title: "Offer submitted", description: `Offer for ${offerPrice} submitted` });
+    setProductModalOpen(false);
+  };
+
   const [deleteVariantDialogOpen, setDeleteVariantDialogOpen] = useState(false);
   const [deletingVariant, setDeletingVariant] = useState<any | null>(null);
 

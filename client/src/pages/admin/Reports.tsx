@@ -1,38 +1,27 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell } from "recharts";
 
-function monthLabel(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleString(undefined, { month: "short", year: "numeric" });
-}
+const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f7f", "#8fd3ff"];
 
 export default function Reports() {
-  const { data: orders } = useQuery<any[]>({ queryKey: ["/api/admin/orders"] });
+  const { data: topSkus } = useQuery({ queryKey: ["/api/admin/reports/top-skus"], queryFn: async () => { const res = await fetch('/api/admin/reports/top-skus'); return res.ok ? res.json() : []; }, retry: false });
+  const { data: suppliers } = useQuery({ queryKey: ["/api/admin/reports/top-suppliers"], queryFn: async () => { const res = await fetch('/api/admin/reports/top-suppliers'); return res.ok ? res.json() : []; }, retry: false });
+  const { data: byRegion } = useQuery({ queryKey: ["/api/admin/reports/sales-by-region"], queryFn: async () => { const res = await fetch('/api/admin/reports/sales-by-region'); return res.ok ? res.json() : []; }, retry: false });
+  const { data: timeseries } = useQuery({ queryKey: ["/api/admin/reports/sales-timeseries"], queryFn: async () => { const res = await fetch('/api/admin/reports/sales-timeseries'); return res.ok ? res.json() : []; }, retry: false });
 
   const monthly = useMemo(() => {
-    if (!orders) return [];
-    const map: Record<string, number> = {};
-    for (const o of orders) {
-      const label = monthLabel(o.createdAt || o.created_at || new Date().toISOString());
-      const amount = parseFloat(o.total || o.totalAmount || 0) || 0;
-      map[label] = (map[label] || 0) + amount;
-    }
-    return Object.keys(map).sort((a,b)=> new Date(a).getTime() - new Date(b).getTime()).map(k=>({ month: k, revenue: map[k] }));
-  }, [orders]);
+    if (!timeseries) return [];
+    return timeseries.map((t: any) => ({ month: t.month, revenue: t.total || 0, count: t.count || 0 }));
+  }, [timeseries]);
 
   const statusDist = useMemo(() => {
-    if (!orders) return [];
-    const counts: Record<string, number> = {};
-    for (const o of orders) {
-      const s = o.status || "unknown";
-      counts[s] = (counts[s] || 0) + 1;
-    }
-    return Object.keys(counts).map(k=>({ name: k, value: counts[k] }));
-  }, [orders]);
-
-  const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f7f", "#8fd3ff"];
+    // derive from suppliers or topSkus fallback - keep small pie from topSkus counts
+    if (!topSkus) return [];
+    // create a simple distribution of top SKU quantities by first 5
+    return topSkus.slice(0,5).map((s:any, i:number)=>({ name: s.sku || s.name || `sku-${i}`, value: s.qty || 0 }));
+  }, [topSkus]);
 
   return (
     <div className="space-y-6">
@@ -41,10 +30,62 @@ export default function Reports() {
         <p className="text-muted-foreground mt-1">Sales and platform metrics</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Revenue</CardTitle>
+            <CardTitle>Top SKUs</CardTitle>
+            <CardDescription>Most sold items</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {topSkus?.map((s: any, i: number) => (
+                <li key={s.sku || i} className="flex justify-between">
+                  <span>{s.name || s.sku}</span>
+                  <span className="font-semibold">{s.qty}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Suppliers</CardTitle>
+            <CardDescription>Suppliers by revenue</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {suppliers?.map((s: any) => (
+                <li key={s.companyId} className="flex justify-between">
+                  <span>{s.name}</span>
+                  <span className="font-semibold">${(s.revenue || 0).toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Sales by Region</CardTitle>
+            <CardDescription>Revenue by state</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {byRegion?.map((r: any) => (
+                <li key={r.state} className="flex justify-between">
+                  <span>{r.state}</span>
+                  <span className="font-semibold">${(r.total || 0).toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Sales (Monthly)</CardTitle>
+            <CardDescription>Revenue by month</CardDescription>
           </CardHeader>
           <CardContent>
             <div style={{ height: 300 }}>
@@ -63,10 +104,10 @@ export default function Reports() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Order Status Distribution</CardTitle>
+            <CardTitle>Order Status Distribution (Sample)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div style={{ height: 300 }} className="flex items-center justify-center">
+            <div style={{ height: 260 }} className="flex items-center justify-center">
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie data={statusDist} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
