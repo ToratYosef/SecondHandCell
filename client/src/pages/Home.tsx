@@ -4,11 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { CheckCircle2, TrendingUp, Truck, Users, Smartphone, Tablet, Laptop, Watch } from "lucide-react";
-import warehouseHero from "@assets/generated_images/Warehouse_hero_background_image_8f8c1570.png";
-import smartphonesImg from "@assets/generated_images/Smartphones_category_showcase_e50f627a.png";
-import tabletsImg from "@assets/generated_images/Tablets_category_showcase_f9fdb22c.png";
-import laptopsImg from "@assets/generated_images/Laptops_category_showcase_198d90c9.png";
-import smartwatchesImg from "@assets/generated_images/Smartwatches_category_showcase_a9319cde.png";
 import { useQuery } from "@tanstack/react-query";
 
 export default function Home() {
@@ -21,10 +16,30 @@ export default function Home() {
   const isAuthenticated = Boolean(user);
 
   const categories = [
-    { name: "Smartphones", slug: "smartphones", icon: Smartphone, image: smartphonesImg },
-    { name: "Tablets", slug: "tablets", icon: Tablet, image: tabletsImg },
-    { name: "Laptops", slug: "laptops", icon: Laptop, image: laptopsImg },
-    { name: "Wearables", slug: "wearables", icon: Watch, image: smartwatchesImg },
+    {
+      name: "Smartphones",
+      slug: "smartphones",
+      icon: Smartphone,
+      gradient: "from-sky-500/20 via-sky-500/10 to-slate-900",
+    },
+    {
+      name: "Tablets",
+      slug: "tablets",
+      icon: Tablet,
+      gradient: "from-amber-500/20 via-amber-500/10 to-slate-900",
+    },
+    {
+      name: "Laptops",
+      slug: "laptops",
+      icon: Laptop,
+      gradient: "from-emerald-500/20 via-emerald-500/10 to-slate-900",
+    },
+    {
+      name: "Wearables",
+      slug: "wearables",
+      icon: Watch,
+      gradient: "from-violet-500/20 via-violet-500/10 to-slate-900",
+    },
   ];
 
   const steps = [
@@ -93,12 +108,12 @@ export default function Home() {
       
       <main className="flex-1">
         {/* Hero Section */}
-        <section
-          className="relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-cover bg-center"
-          style={{ backgroundImage: `url(${warehouseHero})` }}
-        >
-          {/* Dark gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/70" />
+        <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-slate-950">
+          <div
+            className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.12),transparent_35%),radial-gradient(circle_at_80%_0,rgba(129,140,248,0.14),transparent_30%),radial-gradient(circle_at_50%_80%,rgba(16,185,129,0.12),transparent_35%)]"
+            aria-hidden
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-black/80" />
           
           <div className="relative z-10 mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
             <h1 className="mb-6 text-5xl font-bold tracking-tight text-white lg:text-6xl" data-testid="text-hero-headline">
@@ -196,12 +211,10 @@ export default function Home() {
               {categories.map((category) => (
                 <Link key={category.slug} href={`buyer3/catalog?category=${category.slug}`}>
                   <Card className="group overflow-hidden hover-elevate active-elevate-2" data-testid={`card-category-${category.slug}`}>
-                    <div className="aspect-[4/3] overflow-hidden bg-muted">
-                      <img
-                        src={category.image}
-                        alt={category.name}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
+                    <div
+                      className={`flex aspect-[4/3] items-center justify-center bg-gradient-to-br ${category.gradient}`}
+                    >
+                      <category.icon className="h-14 w-14 text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.25)] transition-transform duration-300 group-hover:scale-105" />
                     </div>
                     <CardHeader className="text-center">
                       <CardTitle className="flex items-center justify-center gap-2">

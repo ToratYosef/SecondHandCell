@@ -792,6 +792,9 @@ var DatabaseStorage = class {
     const [variant] = await db.update(deviceVariants).set(updates).where(eq(deviceVariants.id, id)).returning();
     return variant || void 0;
   }
+  async deleteDeviceVariant(id) {
+    await db.delete(deviceVariants).where(eq(deviceVariants.id, id));
+  }
   // Inventory methods
   async getInventoryByVariantId(variantId) {
     const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.deviceVariantId, variantId));
@@ -805,6 +808,9 @@ var DatabaseStorage = class {
     const [item] = await db.update(inventoryItems).set(updates).where(eq(inventoryItems.id, id)).returning();
     return item || void 0;
   }
+  async deleteInventoryByVariantId(variantId) {
+    await db.delete(inventoryItems).where(eq(inventoryItems.deviceVariantId, variantId));
+  }
   // Price Tier methods
   async getPriceTiersByVariantId(variantId) {
     return await db.select().from(priceTiers).where(and(
@@ -815,6 +821,13 @@ var DatabaseStorage = class {
   async createPriceTier(insertTier) {
     const [tier] = await db.insert(priceTiers).values(insertTier).returning();
     return tier;
+  }
+  async updatePriceTier(id, updates) {
+    const [tier] = await db.update(priceTiers).set(updates).where(eq(priceTiers.id, id)).returning();
+    return tier || void 0;
+  }
+  async deletePriceTiersByVariantId(variantId) {
+    await db.delete(priceTiers).where(eq(priceTiers.deviceVariantId, variantId));
   }
   // Cart methods
   async getCartByUserId(userId) {
@@ -1006,6 +1019,7 @@ var storage = new DatabaseStorage();
 import bcrypt from "bcrypt";
 import Stripe from "stripe";
 import { z } from "zod";
+var slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 var stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -1051,7 +1065,8 @@ var requireAdmin = async (req, res, next) => {
   next();
 };
 async function registerRoutes(app2) {
-  const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV === "production" ? (() => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const sessionSecret = process.env.SESSION_SECRET || (isProduction ? (() => {
     throw new Error("SESSION_SECRET must be set in production");
   })() : "dev-secret-only-for-local-development");
   const MemoryStore = createMemoryStore(session);
@@ -1063,9 +1078,9 @@ async function registerRoutes(app2) {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1e3
       // 7 days
     }
@@ -1710,6 +1725,40 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Failed to get companies" });
     }
   });
+  app2.post("/api/admin/companies/bulk", requireAdmin, async (req, res) => {
+    try {
+      const { companyIds, status, creditLimit } = req.body;
+      if (!Array.isArray(companyIds) || companyIds.length === 0) {
+        return res.status(400).json({ error: "companyIds must be a non-empty array" });
+      }
+      const results = await db.transaction(async (tx) => {
+        const updated = [];
+        for (const id of companyIds) {
+          const updates = {};
+          if (status) updates.status = status;
+          if (creditLimit !== void 0) updates.creditLimit = creditLimit;
+          const [company] = await tx.update(companies).set(updates).where(companies.id.equals(id)).returning();
+          if (company) {
+            await tx.insert(auditLogs).values({
+              actorUserId: req.session.userId || null,
+              companyId: id,
+              action: "company_bulk_updated",
+              entityType: "company",
+              entityId: id,
+              previousValues: null,
+              newValues: JSON.stringify(updates)
+            });
+            updated.push(company);
+          }
+        }
+        return updated;
+      });
+      res.json({ updated: results });
+    } catch (error) {
+      console.error("Bulk update companies error:", error);
+      res.status(500).json({ error: "Failed to bulk update companies" });
+    }
+  });
   app2.patch("/api/admin/companies/:id", requireAdmin, async (req, res) => {
     try {
       const { status, creditLimit } = req.body;
@@ -1729,6 +1778,242 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Update company error:", error);
       res.status(500).json({ error: "Failed to update company" });
+    }
+  });
+  app2.post("/api/admin/device-models", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        brand: z.string(),
+        name: z.string(),
+        marketingName: z.string().optional(),
+        sku: z.string(),
+        categorySlug: z.string().optional(),
+        categoryName: z.string().optional(),
+        description: z.string().optional(),
+        imageUrl: z.string().optional(),
+        variant: z.object({
+          storage: z.string(),
+          color: z.string(),
+          conditionGrade: z.string(),
+          networkLockStatus: z.string().default("unlocked"),
+          internalCode: z.string().optional(),
+          unitPrice: z.number(),
+          quantity: z.number().min(0),
+          minOrderQuantity: z.number().min(1).default(1)
+        })
+      });
+      const data = schema.parse(req.body);
+      let categoryId;
+      if (data.categorySlug) {
+        const category = await storage.getCategoryBySlug(data.categorySlug);
+        categoryId = category?.id;
+      }
+      if (!categoryId) {
+        const fallbackName = data.categoryName || "smartphones";
+        const fallbackSlug = slugify(fallbackName);
+        const existing = await storage.getCategoryBySlug(fallbackSlug);
+        if (existing) {
+          categoryId = existing.id;
+        } else {
+          const created = await storage.createCategory({
+            name: fallbackName,
+            slug: fallbackSlug
+          });
+          categoryId = created.id;
+        }
+      }
+      const baseSlug = slugify(`${data.brand}-${data.name}-${data.sku}`);
+      const model = await storage.createDeviceModel({
+        brand: data.brand,
+        name: data.name,
+        marketingName: data.marketingName || data.name,
+        sku: data.sku,
+        slug: baseSlug,
+        categoryId,
+        imageUrl: data.imageUrl || null,
+        description: data.description || null,
+        isActive: true
+      });
+      const variant = await storage.createDeviceVariant({
+        deviceModelId: model.id,
+        storage: data.variant.storage,
+        color: data.variant.color,
+        conditionGrade: data.variant.conditionGrade,
+        networkLockStatus: data.variant.networkLockStatus,
+        internalCode: data.variant.internalCode || null,
+        isActive: true
+      });
+      await storage.createInventory({
+        deviceVariantId: variant.id,
+        quantityAvailable: data.variant.quantity,
+        minOrderQuantity: data.variant.minOrderQuantity,
+        status: "in_stock"
+      });
+      await storage.createPriceTier({
+        deviceVariantId: variant.id,
+        minQuantity: 1,
+        maxQuantity: null,
+        unitPrice: data.variant.unitPrice,
+        currency: "USD",
+        isActive: true
+      });
+      res.json({ model, variant });
+    } catch (error) {
+      console.error("Create device error:", error);
+      res.status(500).json({ error: "Failed to create device" });
+    }
+  });
+  app2.patch("/api/admin/device-variants/:id", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        storage: z.string().optional(),
+        color: z.string().optional(),
+        conditionGrade: z.string().optional(),
+        networkLockStatus: z.string().optional(),
+        unitPrice: z.number().optional(),
+        quantity: z.number().optional(),
+        minOrderQuantity: z.number().optional()
+      });
+      const data = schema.parse(req.body);
+      const variantId = req.params.id;
+      const variant = await storage.getDeviceVariant(variantId);
+      if (!variant) {
+        return res.status(404).json({ error: "Variant not found" });
+      }
+      const updatedVariant = await storage.updateDeviceVariant(variantId, {
+        storage: data.storage ?? variant.storage,
+        color: data.color ?? variant.color,
+        conditionGrade: data.conditionGrade ?? variant.conditionGrade,
+        networkLockStatus: data.networkLockStatus ?? variant.networkLockStatus
+      });
+      let inventory = await storage.getInventoryByVariantId(variantId);
+      if (data.quantity !== void 0 || data.minOrderQuantity !== void 0) {
+        if (inventory) {
+          inventory = await storage.updateInventory(inventory.id, {
+            quantityAvailable: data.quantity ?? inventory.quantityAvailable,
+            minOrderQuantity: data.minOrderQuantity ?? inventory.minOrderQuantity
+          });
+        } else {
+          inventory = await storage.createInventory({
+            deviceVariantId: variantId,
+            quantityAvailable: data.quantity ?? 0,
+            minOrderQuantity: data.minOrderQuantity ?? 1,
+            status: "in_stock"
+          });
+        }
+      }
+      let priceTier;
+      if (data.unitPrice !== void 0) {
+        const tiers = await storage.getPriceTiersByVariantId(variantId);
+        if (tiers.length > 0) {
+          priceTier = await storage.updatePriceTier(tiers[0].id, { unitPrice: data.unitPrice });
+        } else {
+          priceTier = await storage.createPriceTier({
+            deviceVariantId: variantId,
+            minQuantity: 1,
+            maxQuantity: null,
+            unitPrice: data.unitPrice,
+            currency: "USD",
+            isActive: true
+          });
+        }
+      }
+      res.json({ variant: updatedVariant, inventory, priceTier });
+    } catch (error) {
+      console.error("Update variant error:", error);
+      res.status(500).json({ error: "Failed to update variant" });
+    }
+  });
+  app2.delete("/api/admin/device-variants/:id", requireAdmin, async (req, res) => {
+    try {
+      const variantId = req.params.id;
+      await storage.deletePriceTiersByVariantId(variantId);
+      await storage.deleteInventoryByVariantId(variantId);
+      await storage.deleteDeviceVariant(variantId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete variant error:", error);
+      res.status(500).json({ error: "Failed to delete variant" });
+    }
+  });
+  app2.post("/api/admin/device-import", requireAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        devices: z.array(
+          z.object({
+            brand: z.string(),
+            name: z.string(),
+            marketingName: z.string().optional(),
+            sku: z.string(),
+            categorySlug: z.string().optional(),
+            categoryName: z.string().optional(),
+            variants: z.array(
+              z.object({
+                storage: z.string(),
+                color: z.string(),
+                conditionGrade: z.string(),
+                networkLockStatus: z.string().default("unlocked"),
+                unitPrice: z.number(),
+                quantity: z.number().min(0)
+              })
+            )
+          })
+        )
+      });
+      const data = schema.parse(req.body);
+      const created = [];
+      for (const device of data.devices) {
+        const categorySlug = device.categorySlug || slugify(device.categoryName || "smartphones");
+        let categoryId;
+        const existingCategory = await storage.getCategoryBySlug(categorySlug);
+        if (existingCategory) {
+          categoryId = existingCategory.id;
+        } else {
+          const createdCategory = await storage.createCategory({
+            name: device.categoryName || device.brand,
+            slug: categorySlug
+          });
+          categoryId = createdCategory.id;
+        }
+        const model = await storage.createDeviceModel({
+          brand: device.brand,
+          name: device.name,
+          marketingName: device.marketingName || device.name,
+          sku: device.sku,
+          slug: slugify(`${device.brand}-${device.name}-${device.sku}`),
+          categoryId,
+          isActive: true
+        });
+        for (const variantData of device.variants) {
+          const variant = await storage.createDeviceVariant({
+            deviceModelId: model.id,
+            storage: variantData.storage,
+            color: variantData.color,
+            conditionGrade: variantData.conditionGrade,
+            networkLockStatus: variantData.networkLockStatus,
+            isActive: true
+          });
+          await storage.createInventory({
+            deviceVariantId: variant.id,
+            quantityAvailable: variantData.quantity,
+            minOrderQuantity: 1,
+            status: "in_stock"
+          });
+          await storage.createPriceTier({
+            deviceVariantId: variant.id,
+            minQuantity: 1,
+            maxQuantity: null,
+            unitPrice: variantData.unitPrice,
+            currency: "USD",
+            isActive: true
+          });
+          created.push({ model, variant });
+        }
+      }
+      res.json({ created });
+    } catch (error) {
+      console.error("Import devices error:", error);
+      res.status(500).json({ error: "Failed to import devices" });
     }
   });
   app2.post("/api/quotes", requireAuth, async (req, res) => {
@@ -1941,6 +2226,209 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Get all orders error:", error);
       res.status(500).json({ error: "Failed to get orders" });
+    }
+  });
+  app2.get("/api/admin/export/orders.csv", requireAdmin, async (req, res) => {
+    try {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      const filename = `orders-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      const pageSize = parseInt(String(req.query.pageSize || "500"), 10) || 500;
+      const csvEscape = (v) => {
+        if (v === null || v === void 0) return "";
+        const s = String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      };
+      res.write(["orderNumber", "companyName", "companyId", "status", "paymentStatus", "total", "currency", "createdAt", "shippingState", "shippingCity", "items"].join(",") + "\n");
+      const totalOrders = (await db.select().from(orders)).length;
+      res.setHeader("X-Total-Rows", String(totalOrders));
+      const stmt = sqlite.prepare(`SELECT * FROM orders ORDER BY created_at ASC`);
+      for (const order of stmt.iterate()) {
+        const items = await storage.getOrderItems(order.id);
+        const company = await storage.getCompany(order.companyId);
+        let shippingState = "";
+        let shippingCity = "";
+        if (order.shipping_address_id) {
+          const addrStmt = sqlite.prepare(`SELECT * FROM shipping_addresses WHERE id = ?`);
+          const addr = addrStmt.get(order.shipping_address_id);
+          if (addr) {
+            shippingState = addr.state || "";
+            shippingCity = addr.city || "";
+          }
+        }
+        const itemsSummary = items.map((i) => `${i.quantity}x ${i.deviceVariantId} @ ${i.unitPrice}`).join("; ");
+        const row = [
+          csvEscape(order.order_number || order.orderNumber),
+          csvEscape(company?.name || ""),
+          csvEscape(order.company_id || order.companyId),
+          csvEscape(order.status),
+          csvEscape(order.payment_status || order.paymentStatus),
+          csvEscape(order.total),
+          csvEscape(order.currency),
+          csvEscape(new Date(order.created_at || order.createdAt).toISOString()),
+          csvEscape(shippingState),
+          csvEscape(shippingCity),
+          csvEscape(itemsSummary)
+        ];
+        res.write(row.join(",") + "\n");
+      }
+      res.end();
+    } catch (error) {
+      console.error("Export orders CSV error:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to export orders" });
+    }
+  });
+  app2.get("/api/admin/export/inventory.csv", requireAdmin, async (req, res) => {
+    try {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      const filename = `inventory-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      const pageSize = parseInt(String(req.query.pageSize || "500"), 10) || 500;
+      const csvEscape = (v) => {
+        if (v === null || v === void 0) return "";
+        const s = String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      };
+      res.write(["modelSku", "brand", "modelName", "variantId", "storage", "color", "conditionGrade", "quantityAvailable", "minOrderQuantity", "unitPrice"].join(",") + "\n");
+      const modelsCount = (await db.select().from(deviceModels)).length;
+      let totalRows = 0;
+      const allModels = await db.select().from(deviceModels);
+      for (const m of allModels) {
+        const variants = await db.select().from(deviceVariants).where(deviceVariants.deviceModelId.equals(m.id));
+        totalRows += variants.length;
+      }
+      res.setHeader("X-Total-Rows", String(totalRows));
+      const modelStmt = sqlite.prepare(`SELECT * FROM device_models ORDER BY created_at ASC`);
+      for (const model of modelStmt.iterate()) {
+        const variantStmt = sqlite.prepare(`SELECT * FROM device_variants WHERE device_model_id = ?`);
+        for (const variant of variantStmt.iterate(model.id)) {
+          const inventory = await storage.getInventoryByVariantId(variant.id);
+          const tiers = await storage.getPriceTiersByVariantId(variant.id);
+          const unitPrice = tiers && tiers.length > 0 ? tiers[0].unitPrice : "";
+          const row = [
+            csvEscape(model.sku),
+            csvEscape(model.brand),
+            csvEscape(model.name),
+            csvEscape(variant.id),
+            csvEscape(variant.storage),
+            csvEscape(variant.color),
+            csvEscape(variant.condition_grade || variant.conditionGrade),
+            csvEscape(inventory?.quantityAvailable ?? 0),
+            csvEscape(inventory?.minOrderQuantity ?? 1),
+            csvEscape(unitPrice)
+          ];
+          res.write(row.join(",") + "\n");
+        }
+      }
+      res.end();
+    } catch (error) {
+      console.error("Export inventory CSV error:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to export inventory" });
+    }
+  });
+  app2.get("/api/admin/reports/top-skus", requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(String(req.query.limit || "20"), 10) || 20;
+      const orders2 = await storage.getAllOrders();
+      const skuMap = /* @__PURE__ */ new Map();
+      for (const order of orders2) {
+        const items = await storage.getOrderItems(order.id);
+        for (const item of items) {
+          const variant = await storage.getDeviceVariant(item.deviceVariantId);
+          if (!variant) continue;
+          const model = await storage.getDeviceModel(variant.deviceModelId);
+          const key = model?.sku || variant.id;
+          const existing = skuMap.get(key) || { sku: key, brand: model?.brand || "", name: model?.name || "", qty: 0, revenue: 0 };
+          existing.qty += item.quantity;
+          existing.revenue += parseFloat(item.unitPrice) * item.quantity || 0;
+          skuMap.set(key, existing);
+        }
+      }
+      const results = Array.from(skuMap.values()).sort((a, b) => b.qty - a.qty).slice(0, limit);
+      res.json(results);
+    } catch (error) {
+      console.error("Top SKUs report error:", error);
+      res.status(500).json({ error: "Failed to compute top SKUs" });
+    }
+  });
+  app2.get("/api/admin/reports/sales-by-region", requireAdmin, async (req, res) => {
+    try {
+      const orders2 = await storage.getAllOrders();
+      const byState = /* @__PURE__ */ new Map();
+      for (const order of orders2) {
+        let state = "unknown";
+        if (order.shippingAddressId) {
+          const [addr] = await db.select().from(shippingAddresses).where(shippingAddresses.id.equals(order.shippingAddressId));
+          if (addr) state = addr.state || "unknown";
+        }
+        const current = byState.get(state) || { state, total: 0, count: 0 };
+        current.total += parseFloat(order.total) || 0;
+        current.count += 1;
+        byState.set(state, current);
+      }
+      res.json(Array.from(byState.values()).sort((a, b) => b.total - a.total));
+    } catch (error) {
+      console.error("Sales by region report error:", error);
+      res.status(500).json({ error: "Failed to compute sales by region" });
+    }
+  });
+  app2.get("/api/admin/reports/companies-status", requireAdmin, async (req, res) => {
+    try {
+      const companies2 = await storage.getAllCompanies();
+      const map = /* @__PURE__ */ new Map();
+      for (const c of companies2) {
+        const key = c.status || "unknown";
+        map.set(key, (map.get(key) || 0) + 1);
+      }
+      res.json(Array.from(map.entries()).map(([status, count]) => ({ status, count })));
+    } catch (error) {
+      console.error("Companies status report error:", error);
+      res.status(500).json({ error: "Failed to compute companies status" });
+    }
+  });
+  app2.get("/api/admin/reports/top-suppliers", requireAdmin, async (req, res) => {
+    try {
+      const orders2 = await storage.getAllOrders();
+      const map = /* @__PURE__ */ new Map();
+      for (const o of orders2) {
+        const company = await storage.getCompany(o.companyId);
+        const key = company?.id || o.companyId;
+        const entry = map.get(key) || { companyId: key, name: company?.name || "Unknown", revenue: 0, orders: 0 };
+        entry.revenue += parseFloat(o.total) || 0;
+        entry.orders += 1;
+        map.set(key, entry);
+      }
+      const results = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 50);
+      res.json(results);
+    } catch (error) {
+      console.error("Top suppliers report error:", error);
+      res.status(500).json({ error: "Failed to compute top suppliers" });
+    }
+  });
+  app2.get("/api/admin/reports/sales-timeseries", requireAdmin, async (req, res) => {
+    try {
+      const { start, end } = req.query;
+      const orders2 = await storage.getAllOrders();
+      const byMonth = /* @__PURE__ */ new Map();
+      for (const o of orders2) {
+        const date = new Date(o.createdAt);
+        const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+        const entry = byMonth.get(month) || { month, total: 0, count: 0 };
+        entry.total += parseFloat(o.total) || 0;
+        entry.count += 1;
+        byMonth.set(month, entry);
+      }
+      const series = Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month));
+      res.json(series);
+    } catch (error) {
+      console.error("Sales timeseries error:", error);
+      res.status(500).json({ error: "Failed to compute sales timeseries" });
     }
   });
   app2.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
@@ -2267,6 +2755,22 @@ function serveStatic(app2) {
 
 // server/index.ts
 var app = express2();
+var allowedOrigins = (process.env.CORS_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean);
+app.set("trust proxy", 1);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  res.header("Vary", "Origin");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(express2.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
