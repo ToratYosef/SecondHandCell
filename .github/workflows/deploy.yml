@@ -39,6 +39,8 @@ jobs:
         run: npm ci
       - name: Build with Vite
         run: npm run build
+        env:
+          VITE_API_BASE_URL: https://secondhandcell-1.onrender.com
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
