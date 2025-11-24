@@ -13,7 +13,8 @@
     "check": "tsc",
     "test": "jest --runInBand",
     "db:push": "drizzle-kit push",
-    "import:devices": "tsx server/scripts/importDeviceModelsFromXml.ts"
+    "import:devices": "tsx server/scripts/importDeviceModelsFromXml.ts",
+    "bundle:backend": "./scripts/make-backend-zip.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

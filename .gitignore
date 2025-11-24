@@ -4,3 +4,4 @@ node_modules
 *.png
 *.gz
 *.pyc
+backend-only.zip
