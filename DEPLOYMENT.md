@@ -2,6 +2,9 @@
 
 This project can be hosted with the API on Render and the static frontend on GitHub Pages.
 
+## Backend-only bundle helper
+Run `npm run bundle:backend` (or execute `./scripts/make-backend-zip.sh`) to produce `backend-only.zip` that contains only the API code and shared schema files. The script skips frontend assets, `node_modules`, and build artifacts so you can upload the archive directly to Render or another backend-only host.
+
 ## Backend (Render)
 1. Create a **Web Service** in Render pointing at this repo.
 2. Set build and start commands:
