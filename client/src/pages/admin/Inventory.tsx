@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, Search, AlertTriangle, Upload, Pencil, Trash2, Plus, Minus, SlidersHorizontal, RefreshCw, FileText, TrendingUp, TrendingDown } from "lucide-react";
 import { ConditionBadge } from "@/components/ConditionBadge";
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -570,6 +570,9 @@ export default function Inventory() {
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Edit Variant</DialogTitle>
+            <DialogDescription>
+              Update the details and pricing for this device variant.
+            </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleVariantSave}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -656,6 +659,9 @@ export default function Inventory() {
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Add a Device</DialogTitle>
+            <DialogDescription>
+              Create a new device model and add it to your inventory.
+            </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleAddSubmit}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -785,6 +791,9 @@ export default function Inventory() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Import Devices</DialogTitle>
+            <DialogDescription>
+              Upload multiple devices at once using JSON format.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label>Paste JSON payload</Label>
@@ -808,6 +817,9 @@ export default function Inventory() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Variant</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the variant from inventory.
+            </DialogDescription>
           </DialogHeader>
           <div>
             <p>Are you sure you want to delete {deletingVariant ? `${deletingVariant.device.marketingName} (${deletingVariant.storage} ${deletingVariant.color})` : "this variant"}?</p>

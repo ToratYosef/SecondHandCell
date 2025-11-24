@@ -29,9 +29,22 @@ export default function LoginNew() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
   const [registerPhone, setRegisterPhone] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [website, setWebsite] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [addressPhone, setAddressPhone] = useState("");
+  const [street1, setStreet1] = useState("");
+  const [street2, setStreet2] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [registerError, setRegisterError] = useState("");
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerStep, setRegisterStep] = useState(1); // Multi-step form
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +109,19 @@ export default function LoginNew() {
           name: registerName,
           email: registerEmail,
           password: registerPassword,
-          phone: registerPhone || undefined,
+          phone: registerPhone,
+          companyName,
+          legalName,
+          businessType,
+          website: website || undefined,
+          taxId: taxId || undefined,
+          contactName,
+          addressPhone,
+          street1,
+          street2: street2 || undefined,
+          city,
+          state,
+          postalCode,
         }),
       });
 
@@ -311,9 +336,9 @@ export default function LoginNew() {
               <TabsContent value="register">
                 <form onSubmit={handleRegister}>
                   <CardContent className="space-y-4">
-                    <div className="text-center mb-6">
+                    <div className="text-center mb-4">
                       <h2 className="text-2xl font-bold">Create Account</h2>
-                      <p className="text-muted-foreground">Join thousands of satisfied sellers</p>
+                      <p className="text-muted-foreground">Step {registerStep} of 3</p>
                     </div>
 
                     {registerError && (
@@ -322,126 +347,296 @@ export default function LoginNew() {
                       </Alert>
                     )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="register-name">Full Name</Label>
-                      <Input
-                        id="register-name"
-                        placeholder="John Doe"
-                        value={registerName}
-                        onChange={(e) => setRegisterName(e.target.value)}
-                        required
-                        disabled={registerLoading}
-                      />
-                    </div>
+                    {/* Step 1: Personal Information */}
+                    {registerStep === 1 && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="register-name">Full Name *</Label>
+                          <Input
+                            id="register-name"
+                            placeholder="John Doe"
+                            value={registerName}
+                            onChange={(e) => setRegisterName(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="register-email">Email</Label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        placeholder="you@company.com"
-                        value={registerEmail}
-                        onChange={(e) => setRegisterEmail(e.target.value)}
-                        required
-                        disabled={registerLoading}
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="register-email">Email *</Label>
+                          <Input
+                            id="register-email"
+                            type="email"
+                            placeholder="you@company.com"
+                            value={registerEmail}
+                            onChange={(e) => setRegisterEmail(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="register-password">Password</Label>
-                      <Input
-                        id="register-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={registerPassword}
-                        onChange={(e) => setRegisterPassword(e.target.value)}
-                        required
-                        minLength={8}
-                        disabled={registerLoading}
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="register-phone">Phone Number *</Label>
+                          <Input
+                            id="register-phone"
+                            type="tel"
+                            placeholder="+1 (555) 000-0000"
+                            value={registerPhone}
+                            onChange={(e) => setRegisterPhone(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="register-confirm">Confirm Password</Label>
-                      <Input
-                        id="register-confirm"
-                        type="password"
-                        placeholder="••••••••"
-                        value={registerConfirmPassword}
-                        onChange={(e) => setRegisterConfirmPassword(e.target.value)}
-                        required
-                        minLength={8}
-                        disabled={registerLoading}
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="register-password">Password *</Label>
+                          <Input
+                            id="register-password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={registerPassword}
+                            onChange={(e) => setRegisterPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            disabled={registerLoading}
+                          />
+                          <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="register-phone">Phone Number (Optional)</Label>
-                      <Input
-                        id="register-phone"
-                        type="tel"
-                        placeholder="+1 (555) 000-0000"
-                        value={registerPhone}
-                        onChange={(e) => setRegisterPhone(e.target.value)}
-                        disabled={registerLoading}
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="register-confirm">Confirm Password *</Label>
+                          <Input
+                            id="register-confirm"
+                            type="password"
+                            placeholder="••••••••"
+                            value={registerConfirmPassword}
+                            onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            disabled={registerLoading}
+                          />
+                        </div>
+                      </div>
+                    )}
 
-                    <div className="flex items-start space-x-2">
-                      <Checkbox
-                        id="terms"
-                        checked={acceptedTerms}
-                        onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
-                        disabled={registerLoading}
-                      />
-                      <label htmlFor="terms" className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        I agree to the{" "}
-                        <a href="/terms" className="text-primary hover:underline">
-                          Terms & Conditions
-                        </a>
-                      </label>
-                    </div>
+                    {/* Step 2: Company Information */}
+                    {registerStep === 2 && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="company-name">Company Name *</Label>
+                          <Input
+                            id="company-name"
+                            placeholder="Acme Inc."
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="legal-name">Legal Name *</Label>
+                          <Input
+                            id="legal-name"
+                            placeholder="Acme Incorporated"
+                            value={legalName}
+                            onChange={(e) => setLegalName(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="business-type">Business Type *</Label>
+                          <Input
+                            id="business-type"
+                            placeholder="LLC, Corporation, etc."
+                            value={businessType}
+                            onChange={(e) => setBusinessType(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="website">Website</Label>
+                          <Input
+                            id="website"
+                            type="url"
+                            placeholder="https://www.example.com"
+                            value={website}
+                            onChange={(e) => setWebsite(e.target.value)}
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="tax-id">Tax ID / EIN</Label>
+                          <Input
+                            id="tax-id"
+                            placeholder="12-3456789"
+                            value={taxId}
+                            onChange={(e) => setTaxId(e.target.value)}
+                            disabled={registerLoading}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 3: Address Information */}
+                    {registerStep === 3 && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="contact-name">Contact Name *</Label>
+                          <Input
+                            id="contact-name"
+                            placeholder="John Doe"
+                            value={contactName}
+                            onChange={(e) => setContactName(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="address-phone">Phone *</Label>
+                          <Input
+                            id="address-phone"
+                            type="tel"
+                            placeholder="+1 (555) 000-0000"
+                            value={addressPhone}
+                            onChange={(e) => setAddressPhone(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="street1">Street Address *</Label>
+                          <Input
+                            id="street1"
+                            placeholder="123 Main St"
+                            value={street1}
+                            onChange={(e) => setStreet1(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="street2">Address Line 2</Label>
+                          <Input
+                            id="street2"
+                            placeholder="Suite 100"
+                            value={street2}
+                            onChange={(e) => setStreet2(e.target.value)}
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="city">City *</Label>
+                            <Input
+                              id="city"
+                              placeholder="New York"
+                              value={city}
+                              onChange={(e) => setCity(e.target.value)}
+                              required
+                              disabled={registerLoading}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="state">State *</Label>
+                            <Input
+                              id="state"
+                              placeholder="NY"
+                              value={state}
+                              onChange={(e) => setState(e.target.value)}
+                              required
+                              disabled={registerLoading}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="postal-code">Postal Code *</Label>
+                          <Input
+                            id="postal-code"
+                            placeholder="10001"
+                            value={postalCode}
+                            onChange={(e) => setPostalCode(e.target.value)}
+                            required
+                            disabled={registerLoading}
+                          />
+                        </div>
+
+                        <div className="flex items-start space-x-2">
+                          <Checkbox
+                            id="terms"
+                            checked={acceptedTerms}
+                            onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+                            disabled={registerLoading}
+                          />
+                          <label htmlFor="terms" className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                            I agree to the{" "}
+                            <a href="/terms" className="text-primary hover:underline">
+                              Terms & Conditions
+                            </a>
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
 
                   <CardFooter className="flex-col space-y-4">
-                    <Button
-                      type="submit"
-                      className="w-full text-lg h-12"
-                      disabled={registerLoading}
-                    >
-                      {registerLoading ? "Creating account..." : "Create Account"}
-                    </Button>
+                    <div className="flex gap-3 w-full">
+                      {registerStep > 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setRegisterStep(registerStep - 1)}
+                          disabled={registerLoading}
+                          className="flex-1"
+                        >
+                          Back
+                        </Button>
+                      )}
+                      
+                      {registerStep < 3 ? (
+                        <Button
+                          type="button"
+                          onClick={() => setRegisterStep(registerStep + 1)}
+                          disabled={registerLoading}
+                          className="flex-1 text-lg h-12"
+                        >
+                          Continue
+                        </Button>
+                      ) : (
+                        <Button
+                          type="submit"
+                          className="flex-1 text-lg h-12"
+                          disabled={registerLoading}
+                        >
+                          {registerLoading ? "Creating account..." : "Create Account"}
+                        </Button>
+                      )}
+                    </div>
 
                     <p className="text-sm text-center text-muted-foreground">
                       Already have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => setActiveTab("login")}
+                        onClick={() => {
+                          setActiveTab("login");
+                          setRegisterStep(1);
+                        }}
                         className="text-primary hover:underline font-medium"
                       >
                         Log in →
                       </button>
                     </p>
-
-                    <div className="relative w-full">
-                      <Separator className="my-4" />
-                      <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-xs text-muted-foreground">
-                        Or continue with
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                      <Button variant="outline" type="button" className="h-11">
-                        <Chrome className="mr-2 h-4 w-4" />
-                        Google
-                      </Button>
-                      <Button variant="outline" type="button" className="h-11">
-                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                        </svg>
-                        Apple
-                      </Button>
-                    </div>
                   </CardFooter>
                 </form>
               </TabsContent>
