@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api";
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f7f", "#8fd3ff"];
 
 export default function Reports() {
-  const { data: topSkus } = useQuery({
+  const { data: topItems } = useQuery({
     queryKey: ["/api/admin/reports/top-skus"],
     queryFn: async () => {
       const res = await apiFetch('/api/admin/reports/top-skus');
@@ -46,11 +46,9 @@ export default function Reports() {
   }, [timeseries]);
 
   const statusDist = useMemo(() => {
-    // derive from suppliers or topSkus fallback - keep small pie from topSkus counts
-    if (!topSkus) return [];
-    // create a simple distribution of top SKU quantities by first 5
-    return topSkus.slice(0,5).map((s:any, i:number)=>({ name: s.sku || s.name || `sku-${i}`, value: s.qty || 0 }));
-  }, [topSkus]);
+    if (!topItems) return [];
+    return topItems.slice(0,5).map((s:any, i:number)=>({ name: s.name || `item-${i}`, value: s.qty || 0 }));
+  }, [topItems]);
 
   return (
     <div className="space-y-6">
@@ -62,14 +60,14 @@ export default function Reports() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Top SKUs</CardTitle>
-            <CardDescription>Most sold items</CardDescription>
+            <CardTitle>Top Items</CardTitle>
+            <CardDescription>Most sold devices</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {topSkus?.map((s: any, i: number) => (
-                <li key={s.sku || i} className="flex justify-between">
-                  <span>{s.name || s.sku}</span>
+              {topItems?.map((s: any, i: number) => (
+                <li key={s.name || i} className="flex justify-between">
+                  <span>{s.name || `Item ${i + 1}`}</span>
                   <span className="font-semibold">{s.qty}</span>
                 </li>
               ))}
