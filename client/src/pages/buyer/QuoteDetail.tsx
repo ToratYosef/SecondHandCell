@@ -157,7 +157,7 @@ export default function QuoteDetail() {
                 <div key={idx} className="flex items-start justify-between p-4 border rounded-md" data-testid={`item-${idx}`}>
                   <div className="flex-1">
                     <p className="font-medium">
-                      {item.model?.marketingName || `${item.model?.brand} ${item.model?.name}`}
+                      {`${item.model?.brand} ${item.model?.name}`}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {item.variant?.storage} | {item.variant?.color} | Grade {item.variant?.conditionGrade}
