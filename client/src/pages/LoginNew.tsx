@@ -1,672 +1,190 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
-import { apiFetch } from "@/lib/api";
-import { queryClient } from "@/lib/queryClient";
-import { CheckCircle2, Zap, Shield, RotateCcw, DollarSign, Clock, Award, Star, Chrome } from "lucide-react";
-import { BrandLogo } from "@/components/BrandLogo";
+import { UnifiedHeader } from "@/components/UnifiedHeader";
+import { PublicFooter } from "@/components/PublicFooter";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ShieldCheck, Smartphone, Zap, ArrowRight } from "lucide-react";
+
+const loginSchema = z.object({
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
 
 export default function LoginNew() {
   const [, setLocation] = useLocation();
-  const [activeTab, setActiveTab] = useState("login");
-  
-  // Login state
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Register state
-  const [registerName, setRegisterName] = useState("");
-  const [registerEmail, setRegisterEmail] = useState("");
-  const [registerPassword, setRegisterPassword] = useState("");
-  const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
-  const [registerPhone, setRegisterPhone] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [legalName, setLegalName] = useState("");
-  const [businessType, setBusinessType] = useState("");
-  const [website, setWebsite] = useState("");
-  const [taxId, setTaxId] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [addressPhone, setAddressPhone] = useState("");
-  const [street1, setStreet1] = useState("");
-  const [street2, setStreet2] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [registerError, setRegisterError] = useState("");
-  const [registerLoading, setRegisterLoading] = useState(false);
-  const [registerStep, setRegisterStep] = useState(1); // Multi-step form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "buyer@example.com",
+      password: "password123",
+    },
+  });
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError("");
-    setLoginLoading(true);
+  useEffect(() => {
+    document.title = "Sign in | SecondHand(Whole)Cell";
+  }, []);
 
-    try {
-      const response = await apiFetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+  const loginMutation = useMutation({
+    mutationFn: async (values: z.infer<typeof loginSchema>) => {
+      return apiRequest("POST", "/api/auth/login", values);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      setLocation("/buyer/dashboard");
+      toast({
+        title: "Welcome back",
+        description: "You are now signed in and ready to browse inventory",
       });
+    },
+    onError: () => {
+      toast({
+        title: "Unable to sign in",
+        description: "Double-check your credentials and try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Login failed");
-      }
-
-      const data = await response.json();
-      
-      // Invalidate queries and redirect based on role
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      
-      if (data.user?.role === "admin" || data.user?.role === "super_admin") {
-        setLocation("/admin/dashboard");
-      } else {
-        setLocation("/buyer/dashboard");
-      }
-    } catch (err: any) {
-      setLoginError(err.message || "An error occurred");
-    } finally {
-      setLoginLoading(false);
-    }
+  const onSubmit = (values: z.infer<typeof loginSchema>) => {
+    loginMutation.mutate(values);
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRegisterError("");
-
-    if (registerPassword !== registerConfirmPassword) {
-      setRegisterError("Passwords do not match");
-      return;
-    }
-
-    if (registerPassword.length < 8) {
-      setRegisterError("Password must be at least 8 characters");
-      return;
-    }
-
-    if (!acceptedTerms) {
-      setRegisterError("You must accept the Terms & Conditions");
-      return;
-    }
-
-    setRegisterLoading(true);
-
-    try {
-      const response = await apiFetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: registerName,
-          email: registerEmail,
-          password: registerPassword,
-          phone: registerPhone,
-          companyName,
-          legalName,
-          businessType,
-          website: website || undefined,
-          taxId: taxId || undefined,
-          contactName,
-          addressPhone,
-          street1,
-          street2: street2 || undefined,
-          city,
-          state,
-          postalCode,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Registration failed");
-      }
-
-      setLocation("/register/thanks");
-    } catch (err: any) {
-      setRegisterError(err.message || "An error occurred");
-    } finally {
-      setRegisterLoading(false);
-    }
-  };
-
-  const benefits = [
-    { icon: DollarSign, text: "Highest payouts in the industry" },
-    { icon: Zap, text: "Fast 48-hour payments" },
-    { icon: RotateCcw, text: "Free return labels if you change your mind" },
-    { icon: Shield, text: "Instant quote adjustments with full transparency" },
-  ];
-
-  const whyChooseUs = [
+  const featureHighlights = [
     {
-      icon: Clock,
-      title: "Fast Payment",
-      description: "Get paid within 48 hours via Zelle, PayPal, or ACH.",
+      title: "Verified supply",
+      description: "Every lot is test-verified with transparent grading.",
+      icon: ShieldCheck,
     },
     {
-      icon: Award,
-      title: "Best Price Guarantee",
-      description: "We beat most competitors by 10–20%.",
+      title: "Purpose-built for wholesale",
+      description: "Tiered pricing, saved lists, and quote workflows built-in.",
+      icon: Smartphone,
     },
     {
-      icon: CheckCircle2,
-      title: "Transparent Re-offers",
-      description: "See EXACT reasons for price changes.",
-    },
-    {
-      icon: RotateCcw,
-      title: "Free Returns",
-      description: "Changed your mind? We ship it back free.",
+      title: "Lightning-fast checkout",
+      description: "One-click reorders and saved payment methods keep you moving.",
+      icon: Zap,
     },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* Left Side - Hero Section */}
-      <div className="lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white p-8 lg:p-12 flex flex-col justify-between relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
-        </div>
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
+      <UnifiedHeader />
 
-        <div className="relative z-10">
-          {/* Logo */}
-          <div className="mb-12">
-            <BrandLogo variant="white" size="lg" />
-          </div>
-
-          {/* Main Headline */}
-          <div className="space-y-6 mb-12">
-            <h1 className="text-4xl lg:text-5xl font-bold leading-tight">
-              Sell your device <span className="text-white/90">smarter.</span>
+      <main className="flex flex-1 items-center py-16">
+        <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+          <div className="space-y-6">
+            <p className="inline-flex rounded-full border border-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
+              Secure wholesale access
+            </p>
+            <h1 className="text-4xl font-semibold leading-tight tracking-tight lg:text-5xl">
+              Sign in to your buyer workspace
             </h1>
-            <p className="text-xl text-white/90 font-medium">
-              Trusted by thousands. Instant quotes, fast payments, zero stress.
+            <p className="max-w-xl text-base leading-relaxed text-white/80">
+              Access live inventory, submit quotes, and manage orders in one streamlined dashboard.
             </p>
-          </div>
 
-          {/* Benefits */}
-          <div className="space-y-4 mb-12">
-            {benefits.map((benefit, index) => (
-              <div key={index} className="flex items-center gap-4 group">
-                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm group-hover:bg-white/30 transition-colors">
-                  <benefit.icon className="h-5 w-5" />
-                </div>
-                <span className="text-lg">{benefit.text}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Testimonial */}
-          <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20 max-w-md">
-            <div className="flex gap-1 mb-3">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-              ))}
-            </div>
-            <p className="text-white/90 mb-2 italic">
-              "I got paid in less than 2 days. Easiest experience ever."
-            </p>
-            <p className="text-white/70 text-sm">– A.H., Verified Seller</p>
-          </div>
-        </div>
-
-        {/* Footer Links */}
-        <div className="relative z-10 flex gap-6 text-sm text-white/70">
-          <a href="/faq" className="hover:text-white transition-colors">FAQ</a>
-          <a href="/terms" className="hover:text-white transition-colors">Terms</a>
-          <a href="/privacy" className="hover:text-white transition-colors">Privacy</a>
-          <a href="/support" className="hover:text-white transition-colors">Contact</a>
-        </div>
-      </div>
-
-      {/* Right Side - Auth Card */}
-      <div className="lg:w-1/2 flex items-center justify-center p-8 lg:p-12 bg-gradient-to-br from-background to-muted/20">
-        <div className="w-full max-w-md">
-          <Card className="shadow-2xl border-2 bg-background/95 backdrop-blur-sm">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <CardHeader className="space-y-4">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login" className="text-base">Login</TabsTrigger>
-                  <TabsTrigger value="register" className="text-base">Register</TabsTrigger>
-                </TabsList>
-              </CardHeader>
-
-              {/* Login Tab */}
-              <TabsContent value="login">
-                <form onSubmit={handleLogin}>
-                  <CardContent className="space-y-4">
-                    <div className="text-center mb-6">
-                      <h2 className="text-2xl font-bold">Welcome Back</h2>
-                      <p className="text-muted-foreground">Sign in to your account</p>
-                    </div>
-
-                    {loginError && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{loginError}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label htmlFor="login-email">Email</Label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="you@company.com"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        required
-                        disabled={loginLoading}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        required
-                        disabled={loginLoading}
-                      />
-                    </div>
-
-                    <div className="flex justify-end">
-                      <a href="/forgot-password" className="text-sm text-primary hover:underline">
-                        Forgot password?
-                      </a>
-                    </div>
-                  </CardContent>
-
-                  <CardFooter className="flex-col space-y-4">
-                    <Button
-                      type="submit"
-                      className="w-full text-lg h-12"
-                      disabled={loginLoading}
-                    >
-                      {loginLoading ? "Signing in..." : "Sign In"}
-                    </Button>
-
-                    <p className="text-sm text-center text-muted-foreground">
-                      Don't have an account?{" "}
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("register")}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        Create one →
-                      </button>
-                    </p>
-
-                    <div className="relative w-full">
-                      <Separator className="my-4" />
-                      <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-xs text-muted-foreground">
-                        Or continue with
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                      <Button variant="outline" type="button" className="h-11">
-                        <Chrome className="mr-2 h-4 w-4" />
-                        Google
-                      </Button>
-                      <Button variant="outline" type="button" className="h-11">
-                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                        </svg>
-                        Apple
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </form>
-              </TabsContent>
-
-              {/* Register Tab */}
-              <TabsContent value="register">
-                <form onSubmit={handleRegister}>
-                  <CardContent className="space-y-4">
-                    <div className="text-center mb-4">
-                      <h2 className="text-2xl font-bold">Create Account</h2>
-                      <p className="text-muted-foreground">Step {registerStep} of 3</p>
-                    </div>
-
-                    {registerError && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{registerError}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    {/* Step 1: Personal Information */}
-                    {registerStep === 1 && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="register-name">Full Name *</Label>
-                          <Input
-                            id="register-name"
-                            placeholder="John Doe"
-                            value={registerName}
-                            onChange={(e) => setRegisterName(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="register-email">Email *</Label>
-                          <Input
-                            id="register-email"
-                            type="email"
-                            placeholder="you@company.com"
-                            value={registerEmail}
-                            onChange={(e) => setRegisterEmail(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="register-phone">Phone Number *</Label>
-                          <Input
-                            id="register-phone"
-                            type="tel"
-                            placeholder="+1 (555) 000-0000"
-                            value={registerPhone}
-                            onChange={(e) => setRegisterPhone(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="register-password">Password *</Label>
-                          <Input
-                            id="register-password"
-                            type="password"
-                            placeholder="••••••••"
-                            value={registerPassword}
-                            onChange={(e) => setRegisterPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            disabled={registerLoading}
-                          />
-                          <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="register-confirm">Confirm Password *</Label>
-                          <Input
-                            id="register-confirm"
-                            type="password"
-                            placeholder="••••••••"
-                            value={registerConfirmPassword}
-                            onChange={(e) => setRegisterConfirmPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            disabled={registerLoading}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 2: Company Information */}
-                    {registerStep === 2 && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="company-name">Company Name *</Label>
-                          <Input
-                            id="company-name"
-                            placeholder="Acme Inc."
-                            value={companyName}
-                            onChange={(e) => setCompanyName(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="legal-name">Legal Name *</Label>
-                          <Input
-                            id="legal-name"
-                            placeholder="Acme Incorporated"
-                            value={legalName}
-                            onChange={(e) => setLegalName(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="business-type">Business Type *</Label>
-                          <Input
-                            id="business-type"
-                            placeholder="LLC, Corporation, etc."
-                            value={businessType}
-                            onChange={(e) => setBusinessType(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="website">Website</Label>
-                          <Input
-                            id="website"
-                            type="url"
-                            placeholder="https://www.example.com"
-                            value={website}
-                            onChange={(e) => setWebsite(e.target.value)}
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="tax-id">Tax ID / EIN</Label>
-                          <Input
-                            id="tax-id"
-                            placeholder="12-3456789"
-                            value={taxId}
-                            onChange={(e) => setTaxId(e.target.value)}
-                            disabled={registerLoading}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 3: Address Information */}
-                    {registerStep === 3 && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="contact-name">Contact Name *</Label>
-                          <Input
-                            id="contact-name"
-                            placeholder="John Doe"
-                            value={contactName}
-                            onChange={(e) => setContactName(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="address-phone">Phone *</Label>
-                          <Input
-                            id="address-phone"
-                            type="tel"
-                            placeholder="+1 (555) 000-0000"
-                            value={addressPhone}
-                            onChange={(e) => setAddressPhone(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="street1">Street Address *</Label>
-                          <Input
-                            id="street1"
-                            placeholder="123 Main St"
-                            value={street1}
-                            onChange={(e) => setStreet1(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="street2">Address Line 2</Label>
-                          <Input
-                            id="street2"
-                            placeholder="Suite 100"
-                            value={street2}
-                            onChange={(e) => setStreet2(e.target.value)}
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <Label htmlFor="city">City *</Label>
-                            <Input
-                              id="city"
-                              placeholder="New York"
-                              value={city}
-                              onChange={(e) => setCity(e.target.value)}
-                              required
-                              disabled={registerLoading}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="state">State *</Label>
-                            <Input
-                              id="state"
-                              placeholder="NY"
-                              value={state}
-                              onChange={(e) => setState(e.target.value)}
-                              required
-                              disabled={registerLoading}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="postal-code">Postal Code *</Label>
-                          <Input
-                            id="postal-code"
-                            placeholder="10001"
-                            value={postalCode}
-                            onChange={(e) => setPostalCode(e.target.value)}
-                            required
-                            disabled={registerLoading}
-                          />
-                        </div>
-
-                        <div className="flex items-start space-x-2">
-                          <Checkbox
-                            id="terms"
-                            checked={acceptedTerms}
-                            onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
-                            disabled={registerLoading}
-                          />
-                          <label htmlFor="terms" className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            I agree to the{" "}
-                            <a href="/terms" className="text-primary hover:underline">
-                              Terms & Conditions
-                            </a>
-                          </label>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-
-                  <CardFooter className="flex-col space-y-4">
-                    <div className="flex gap-3 w-full">
-                      {registerStep > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setRegisterStep(registerStep - 1)}
-                          disabled={registerLoading}
-                          className="flex-1"
-                        >
-                          Back
-                        </Button>
-                      )}
-                      
-                      {registerStep < 3 ? (
-                        <Button
-                          type="button"
-                          onClick={() => setRegisterStep(registerStep + 1)}
-                          disabled={registerLoading}
-                          className="flex-1 text-lg h-12"
-                        >
-                          Continue
-                        </Button>
-                      ) : (
-                        <Button
-                          type="submit"
-                          className="flex-1 text-lg h-12"
-                          disabled={registerLoading}
-                        >
-                          {registerLoading ? "Creating account..." : "Create Account"}
-                        </Button>
-                      )}
-                    </div>
-
-                    <p className="text-sm text-center text-muted-foreground">
-                      Already have an account?{" "}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTab("login");
-                          setRegisterStep(1);
-                        }}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        Log in →
-                      </button>
-                    </p>
-                  </CardFooter>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </Card>
-
-          {/* Why Choose Us Section */}
-          <div className="mt-12 space-y-6">
-            <h3 className="text-center text-xl font-bold">Why Choose Us?</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {whyChooseUs.map((item, index) => (
-                <div
-                  key={index}
-                  className="p-4 rounded-xl border-2 bg-card hover:shadow-lg transition-all hover:-translate-y-1"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <item.icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">{item.title}</h4>
-                      <p className="text-sm text-muted-foreground">{item.description}</p>
-                    </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {featureHighlights.map((item) => (
+                <div key={item.title} className="group rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-slate-950/40">
+                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-primary-foreground">
+                    <item.icon className="h-5 w-5" />
                   </div>
+                  <h3 className="text-lg font-semibold text-white">{item.title}</h3>
+                  <p className="text-sm text-white/70">{item.description}</p>
                 </div>
               ))}
             </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-sm text-white/80">
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                99.9% uptime
+              </div>
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                <span className="h-2 w-2 rounded-full bg-sky-400" />
+                SOC2-ready infrastructure
+              </div>
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                <span className="h-2 w-2 rounded-full bg-amber-300" />
+                Trusted by 2,000+ resellers
+              </div>
+            </div>
           </div>
+
+          <Card className="border-0 bg-white text-foreground shadow-2xl">
+            <CardHeader className="space-y-2 border-b bg-muted/40">
+              <CardTitle className="text-2xl">Welcome back</CardTitle>
+              <CardDescription>Enter your credentials to continue</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Work email</Label>
+                  <Input id="email" type="email" placeholder="you@company.com" {...register("email")}
+                    className={errors.email ? "border-destructive" : ""}
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                      Forgot?
+                    </Link>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    {...register("password")}
+                    className={errors.password ? "border-destructive" : ""}
+                  />
+                  {errors.password && (
+                    <p className="text-sm text-destructive">{errors.password.message}</p>
+                  )}
+                </div>
+
+                <Button type="submit" className="w-full" size="lg" disabled={loginMutation.isPending}>
+                  {loginMutation.isPending ? "Signing in..." : "Access dashboard"}
+                </Button>
+              </form>
+
+              <div className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
+                New to SecondHand(Whole)Cell? {" "}
+                <Link href="/register" className="font-semibold text-primary">
+                  Apply for a wholesale account
+                </Link>
+                <span className="inline-flex items-center gap-2 pl-2 text-xs font-medium text-emerald-600">
+                  <ArrowRight className="h-3 w-3" /> Approval in one business day
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      </main>
+
+      <PublicFooter />
     </div>
   );
 }
