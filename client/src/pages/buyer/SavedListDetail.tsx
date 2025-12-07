@@ -20,7 +20,6 @@ interface SavedListWithItems extends SavedList {
       deviceModel?: {
         brand: string;
         name: string;
-        marketingName?: string;
       };
     };
   }>;
@@ -227,7 +226,7 @@ export default function SavedListDetail({ params }: { params: { id: string } }) 
           {list.items.map((item) => {
             const variant = item.deviceVariant;
             const model = variant?.deviceModel;
-            const displayName = model?.marketingName || (model ? `${model.brand} ${model.name}` : "Unknown Device");
+            const displayName = model ? `${model.brand} ${model.name}` : "Unknown Device";
 
             return (
               <Card key={item.id} data-testid={`card-item-${item.id}`}>

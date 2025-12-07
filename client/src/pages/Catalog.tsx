@@ -19,7 +19,7 @@ import { apiFetch } from "@/lib/api";
 interface PublicDevice {
   id: string;
   brand: string;
-  marketingName: string;
+  name: string;
   slug: string;
   categoryId: string;
   categoryName: string;
@@ -142,8 +142,7 @@ export default function Catalog() {
       ...variant,
       device: {
         brand: device.brand,
-        marketingName: device.marketingName || device.name,
-        sku: device.sku,
+        name: device.name,
         categoryId: device.categoryId,
       },
       unitPrice: variant.priceTiers?.[0]?.unitPrice,
@@ -186,7 +185,7 @@ export default function Catalog() {
 
   // Group variants by device title + storage
   const groups = filteredVariants.reduce((acc: any, v: any) => {
-    const key = `${v.device.brand} ${v.device.marketingName} ${v.storage}`;
+    const key = `${v.device.brand} ${v.device.name} ${v.storage}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(v);
     return acc;
@@ -369,7 +368,7 @@ export default function Catalog() {
                         <Badge variant="outline">DLS {grade}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {groupVariants.map((v) => v.networkLockStatus).join(", ")} • {groupVariants.map((v) => v.color).filter((c, i, a) => a.indexOf(c) === i).join(", ")}
+                      {groupVariants.map((v) => v.networkLockStatus).join(", ")}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-sm">
                         <span><strong>Items:</strong> {itemsCount}</span>
@@ -390,8 +389,7 @@ export default function Catalog() {
                       {groupVariants.map((variant) => (
                         <div key={variant.id} className="flex items-center justify-between border-t pt-2">
                           <div className="flex-1">
-                            <p className="text-sm font-medium">{variant.storage} {variant.color} ({variant.networkLockStatus})</p>
-                            <p className="text-xs text-muted-foreground">Model: {variant.device.sku}</p>
+                            <p className="text-sm font-medium">{variant.storage} ({variant.networkLockStatus})</p>
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="text-sm">Qty: {variant.inventory?.quantityAvailable || 0}</span>
@@ -433,7 +431,7 @@ export default function Catalog() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {modalVariant && `${modalVariant.device.brand} / ${modalVariant.device.marketingName} / ${modalVariant.storage} / ${modalVariant.color} / ${modalVariant.networkLockStatus.toUpperCase()} / DLS ${modalVariant.conditionGrade}`}
+              {modalVariant && `${modalVariant.device.brand} / ${modalVariant.device.name} / ${modalVariant.storage} / ${modalVariant.networkLockStatus.toUpperCase()} / DLS ${modalVariant.conditionGrade}`}
             </DialogTitle>
           </DialogHeader>
           {modalVariant && (

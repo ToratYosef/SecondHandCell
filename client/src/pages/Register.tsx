@@ -15,13 +15,16 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useFirebaseUser } from "@/hooks/useFirebaseUser";
+import { submitWholesaleApplication } from "@/lib/applications";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
 
 export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { firebaseUser } = useFirebaseUser();
   const [step, setStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     // Account details
     name: "",
@@ -66,16 +69,21 @@ export default function Register() {
     }
 
     try {
-      await apiRequest("POST", "/api/auth/register", {
+      setSubmitting(true);
+      const passwordDigest = formData.password ? await hashText(formData.password) : null;
+
+      await submitWholesaleApplication({
+        userId: firebaseUser?.uid ?? null,
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        password: formData.password,
+        passwordDigest,
         companyName: formData.companyName,
         legalName: formData.legalName,
         website: formData.website,
         taxId: formData.taxId,
         businessType: formData.businessType,
+        resellerCertificateName: formData.resellerCertificate?.name ?? null,
         contactName: formData.contactName,
         addressPhone: formData.addressPhone,
         street1: formData.street1,
@@ -96,6 +104,8 @@ export default function Register() {
         description: error.message || "Unable to submit application",
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -390,8 +400,13 @@ export default function Register() {
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button type="submit" data-testid="button-submit">
-                      Submit Application
+                    <Button
+                      type="submit"
+                      data-testid="button-submit"
+                      disabled={submitting}
+                      aria-busy={submitting}
+                    >
+                      {submitting ? "Submitting..." : "Submit Application"}
                     </Button>
                   )}
                 </div>
@@ -411,4 +426,17 @@ export default function Register() {
       <PublicFooter />
     </div>
   );
+}
+
+async function hashText(input: string) {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    return input;
+  }
+
+  const encoder = new TextEncoder();
+  const buffer = await crypto.subtle.digest("SHA-256", encoder.encode(input));
+
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }

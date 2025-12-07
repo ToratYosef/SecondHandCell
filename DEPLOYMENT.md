@@ -18,7 +18,7 @@ Run `npm run bundle:backend` (or execute `./scripts/make-backend-zip.sh`) to pro
 
 ## Frontend (GitHub Pages)
 1. Create a Pages deployment (GitHub Actions or manual) that publishes `dist/public/`.
-2. Before building, set `VITE_API_BASE_URL` to your Render app URL (e.g., `https://secondhandcell.onrender.com`).
+2. Before building, set `VITE_API_BASE_URL` to your Render app URL (e.g., `https://secondhandcell.onrender.com`). For local development, keep traffic off the hosted API by setting `VITE_DEV_API_BASE_URL` to your local server origin (for example, `http://localhost:3000`) or leaving it empty to use the same origin.
 3. Build the site with `npm run build` and deploy the contents of `dist/public`.
 4. A `CNAME` file is included under `client/public` so the Pages deployment keeps the custom domain `buy.secondhandcell.com`.
 

@@ -13,6 +13,98 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useFirebaseUser } from "@/hooks/useFirebaseUser";
+
+type VariantPayload = {
+  storage?: string;
+  networkLockStatus?: string;
+  conditionGrade?: string;
+  unitPrice?: number;
+  quantity?: number;
+};
+
+type DevicePayload = {
+  brand?: string;
+  name?: string;
+  device?: string;
+  model?: string;
+  slug?: string;
+  imageUrl?: string;
+  category?: string;
+  variants?: VariantPayload[];
+};
+
+type ImportPreview = {
+  brand: string;
+  model: string;
+  storage?: string;
+  networkLockStatus?: string;
+  condition?: string;
+  price?: number;
+  quantity?: number;
+  category?: string;
+  imageUrl?: string;
+  slug?: string;
+};
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function parseDeviceJson(raw: string): ImportPreview[] {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error: any) {
+    throw new Error("JSON could not be parsed. Check the payload.");
+  }
+
+  const entries: DevicePayload[] = Array.isArray(parsed)
+    ? parsed
+    : parsed?.devices || parsed?.items || [];
+
+  if (!Array.isArray(entries)) {
+    throw new Error("Expected an array or { devices: [] } payload.");
+  }
+
+  const previews: ImportPreview[] = [];
+
+  entries.forEach((device) => {
+    const baseBrand = device.brand || device.deviceBrand || device.make || "";
+    const baseModel = device.name || device.model || device.device || "";
+    const slug = device.slug || (baseModel ? slugify(baseModel) : undefined);
+    const baseImage = device.imageUrl || (device as any).image || undefined;
+    const variants = device.variants && Array.isArray(device.variants) ? device.variants : [];
+
+    if (!baseBrand || !baseModel || variants.length === 0) return;
+
+    variants.forEach((variant) => {
+      previews.push({
+        brand: baseBrand,
+        model: baseModel,
+        storage: variant.storage,
+        networkLockStatus: variant.networkLockStatus,
+        condition: variant.conditionGrade,
+        price: typeof variant.unitPrice === "number" ? variant.unitPrice : Number(variant.unitPrice ?? 0),
+        quantity: typeof variant.quantity === "number" ? variant.quantity : Number(variant.quantity ?? 0),
+        category: device.category,
+        imageUrl: baseImage,
+        slug,
+      });
+    });
+  });
+
+  if (previews.length === 0) {
+    throw new Error("No devices found. Include brand, name, and variants for each device.");
+  }
+
+  return previews;
+}
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,33 +112,35 @@ export default function Inventory() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingVariant, setEditingVariant] = useState<any>(null);
+  const { isAdmin, profile } = useFirebaseUser();
   const [editForm, setEditForm] = useState({
     storage: "",
-    color: "",
     conditionGrade: "",
     networkLockStatus: "",
     unitPrice: "0",
     quantity: "0",
     minOrderQuantity: "1",
   });
-  const [importPayload, setImportPayload] = useState(`[
+  const [importJson, setImportJson] = useState(`[
   {
-    "brand": "Apple",
-    "name": "iPhone 13",
-    "marketingName": "iPhone 13",
-    "sku": "IPH13-BASE",
-    "variants": [{ "storage": "128GB", "color": "Black", "conditionGrade": "A", "networkLockStatus": "unlocked", "unitPrice": 499.99, "quantity": 10 }]
+    "brand": "Iphone",
+    "name": "IPHONE 12 PRO",
+    "imageUrl": "https://raw.githubusercontent.com/ToratYosef/BuyBacking/main/iphone/assets/i12p",
+    "category": "Smartphones",
+    "variants": [
+      { "storage": "128GB", "networkLockStatus": "Unlocked", "conditionGrade": "A", "unitPrice": 1000, "quantity": 100 }
+    ]
   }
 ]`);
+  const [parsedImports, setParsedImports] = useState<ImportPreview[]>([]);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [form, setForm] = useState({
     brand: "",
     name: "",
-    marketingName: "",
     imageUrl: "",
-    sku: "",
     categorySlug: "",
     storage: "64GB",
-    color: "Black",
     conditionGrade: "A",
     networkLockStatus: "unlocked",
     unitPrice: "0",
@@ -55,7 +149,6 @@ export default function Inventory() {
   });
   const [filters, setFilters] = useState({
     brand: "",
-    color: "",
     condition: "",
     stock: "all",
   });
@@ -75,13 +168,10 @@ export default function Inventory() {
       return await apiRequest("POST", "/api/admin/device-models", {
         brand: form.brand,
         name: form.name,
-        marketingName: form.marketingName || form.name,
         imageUrl: form.imageUrl || undefined,
-        sku: form.sku,
         categorySlug: form.categorySlug || undefined,
         variant: {
           storage: form.storage,
-          color: form.color,
           conditionGrade: form.conditionGrade,
           networkLockStatus: form.networkLockStatus,
           unitPrice: parseFloat(form.unitPrice || "0"),
@@ -99,24 +189,6 @@ export default function Inventory() {
       toast({
         title: "Failed to add device",
         description: error.message || "Unable to save device",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const importDevicesMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      return await apiRequest("POST", "/api/admin/device-import", payload);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
-      toast({ title: "Import completed", description: "Devices were imported successfully" });
-      setImportDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Import failed",
-        description: error.message || "Unable to import devices",
         variant: "destructive",
       });
     },
@@ -162,17 +234,89 @@ export default function Inventory() {
     addDeviceMutation.mutate();
   };
 
-  const handleImportSubmit = () => {
+  const handleConvertImport = () => {
     try {
-      const parsed = JSON.parse(importPayload);
-      const payload = Array.isArray(parsed) ? { devices: parsed } : parsed;
-      importDevicesMutation.mutate(payload);
-    } catch (error: any) {
+      const parsed = parseDeviceJson(importJson);
+      const sorted = [...parsed].sort((a, b) => {
+        const brandCompare = a.brand.localeCompare(b.brand);
+        if (brandCompare !== 0) return brandCompare;
+
+        const modelCompare = a.model.localeCompare(b.model);
+        if (modelCompare !== 0) return modelCompare;
+
+        const storageCompare = (a.storage || "").localeCompare(b.storage || "");
+        if (storageCompare !== 0) return storageCompare;
+
+        const lockCompare = (a.networkLockStatus || "").localeCompare(b.networkLockStatus || "");
+        if (lockCompare !== 0) return lockCompare;
+
+        return (a.condition || "").localeCompare(b.condition || "");
+      });
+
+      setParsedImports(sorted);
+      setImportError(null);
       toast({
-        title: "Invalid import payload",
-        description: "Please provide valid JSON for devices",
+        title: "Payload converted",
+        description: `Ready to import ${sorted.length} variant${sorted.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error: any) {
+      setParsedImports([]);
+      setImportError(error.message || "Unable to parse JSON");
+      toast({
+        title: "Invalid JSON",
+        description: error.message || "Follow the devices.json format and try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!isAdmin) {
+      toast({ title: "Admin required", description: "Sign in as an admin to import devices." });
+      return;
+    }
+
+    if (parsedImports.length === 0) {
+      toast({ title: "Nothing to import", description: "Convert JSON to preview devices first." });
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const batch = writeBatch(db);
+
+      parsedImports.forEach((item) => {
+        const ref = doc(collection(db, "catalog"));
+        batch.set(ref, {
+          brand: item.brand,
+          model: item.model,
+          slug: item.slug,
+          storage: item.storage,
+          condition: item.condition,
+          networkLockStatus: item.networkLockStatus,
+          price: item.price ?? 0,
+          quantity: item.quantity ?? 0,
+          category: item.category,
+          imageUrl: item.imageUrl,
+          status: "live",
+          updatedAt: serverTimestamp(),
+          createdBy: profile?.email ?? "",
+        });
+      });
+
+      await batch.commit();
+      toast({ title: "Import complete", description: `${parsedImports.length} variant(s) saved to Firestore.` });
+      setParsedImports([]);
+      setImportJson("");
+      setImportDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Import failed",
+        description: error.message || "Could not save devices to Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -180,7 +324,6 @@ export default function Inventory() {
     setEditingVariant(variant);
     setEditForm({
       storage: variant.storage || "",
-      color: variant.color || "",
       conditionGrade: variant.conditionGrade || "",
       networkLockStatus: variant.networkLockStatus || "",
       unitPrice: typeof variant.unitPrice === "number" ? variant.unitPrice.toString() : "0",
@@ -197,7 +340,6 @@ export default function Inventory() {
       id: editingVariant.id,
       payload: {
         storage: editForm.storage,
-        color: editForm.color,
         conditionGrade: editForm.conditionGrade,
         networkLockStatus: editForm.networkLockStatus,
         unitPrice: parseFloat(editForm.unitPrice || "0"),
@@ -226,29 +368,25 @@ export default function Inventory() {
       ...variant,
       device: {
         brand: device.brand,
-        marketingName: device.marketingName,
-        sku: device.sku,
+        name: device.name,
       },
       unitPrice: variant.priceTiers?.[0]?.unitPrice,
     }))
   ) || [];
 
   const brandOptions = Array.from(new Set(devices?.map((d: any) => d.brand) || [])).filter(Boolean);
-  const colorOptions = Array.from(new Set(allVariants.map((v: any) => v.color) || [])).filter(Boolean);
   const conditionOptions = Array.from(new Set(allVariants.map((v: any) => v.conditionGrade) || [])).filter(Boolean);
 
   const filteredVariants = allVariants.filter((variant: any) => {
     const searchLower = searchTerm.toLowerCase();
+    const nameLower = (variant.device.name || "").toLowerCase();
     const matchesSearch =
-      variant.device.marketingName.toLowerCase().includes(searchLower) ||
-      variant.device.brand.toLowerCase().includes(searchLower) ||
-      variant.device.sku.toLowerCase().includes(searchLower) ||
-      variant.storage.toLowerCase().includes(searchLower) ||
-      variant.color.toLowerCase().includes(searchLower);
+      nameLower.includes(searchLower) ||
+      (variant.device.brand || "").toLowerCase().includes(searchLower) ||
+      (variant.storage || "").toLowerCase().includes(searchLower);
 
-      const matchesBrand = filters.brand === "all" || !filters.brand || variant.device.brand === filters.brand;
-      const matchesColor = filters.color === "all" || !filters.color || variant.color === filters.color;
-      const matchesCondition = filters.condition === "all" || !filters.condition || variant.conditionGrade === filters.condition;
+    const matchesBrand = filters.brand === "all" || !filters.brand || variant.device.brand === filters.brand;
+    const matchesCondition = filters.condition === "all" || !filters.condition || variant.conditionGrade === filters.condition;
     const quantity = variant.inventory?.quantityAvailable ?? 0;
     const matchesStock =
       filters.stock === "all" ||
@@ -256,7 +394,7 @@ export default function Inventory() {
       (filters.stock === "out" && quantity === 0) ||
       (filters.stock === "in" && quantity >= 20);
 
-    return matchesSearch && matchesBrand && matchesColor && matchesCondition && matchesStock;
+    return matchesSearch && matchesBrand && matchesCondition && matchesStock;
   });
 
   const lowStockVariants = allVariants.filter((v: any) => 
@@ -283,9 +421,10 @@ export default function Inventory() {
 
   const toggleGroup = (key: string) => setExpandedGroups((s) => ({ ...s, [key]: !s[key] }));
 
-  // Group variants by device title (brand + marketingName + storage)
+  // Group variants by device title (brand + name + storage)
   const groups = allVariants.reduce((acc: any, v: any) => {
-    const title = `${v.device.brand} ${v.device.marketingName} ${v.storage}`;
+    const displayName = v.device.name || v.device.modelName || "";
+    const title = `${v.device.brand} ${displayName} ${v.storage}`.trim();
     if (!acc[title]) acc[title] = [];
     acc[title].push(v);
     return acc;
@@ -432,20 +571,6 @@ export default function Inventory() {
                 </SelectContent>
               </Select>
 
-              <Select value={filters.color} onValueChange={(value) => setFilters({ ...filters, color: value })}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Color" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Colors</SelectItem>
-                  {colorOptions.map((color) => (
-                    <SelectItem key={color} value={color}>
-                      {color}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
               <Select value={filters.condition} onValueChange={(value) => setFilters({ ...filters, condition: value })}>
                 <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Condition" />
@@ -475,7 +600,7 @@ export default function Inventory() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setFilters({ brand: "", color: "", condition: "", stock: "all" })}
+                onClick={() => setFilters({ brand: "", condition: "", stock: "all" })}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Reset
@@ -493,15 +618,18 @@ export default function Inventory() {
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <Badge variant="outline">{variant.device.brand}</Badge>
-                      <h3 className="font-semibold">{variant.device.marketingName}</h3>
-                      <Badge variant="secondary">{variant.storage}</Badge>
-                      <Badge variant="secondary">{variant.color}</Badge>
-                      <ConditionBadge grade={variant.conditionGrade} />
-                    </div>
+                    {(() => {
+                      const displayName = variant.device?.name || variant.device?.modelName;
+                      return (
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <Badge variant="outline">{variant.device.brand}</Badge>
+                          <h3 className="font-semibold">{displayName}</h3>
+                          <Badge variant="secondary">{variant.storage}</Badge>
+                          <ConditionBadge grade={variant.conditionGrade} />
+                        </div>
+                      );
+                    })()}
                     <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                      <span>SKU: {variant.device.sku}</span>
                       <span>Network: {variant.networkLockStatus}</span>
                       <span>Min order: {variant.inventory?.minOrderQuantity ?? 1}</span>
                       {typeof variant.unitPrice === "number" && (
@@ -579,10 +707,6 @@ export default function Inventory() {
               <div className="space-y-2">
                 <Label>Storage</Label>
                 <Input value={editForm.storage} onChange={(e) => setEditForm({ ...editForm, storage: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Input value={editForm.color} onChange={(e) => setEditForm({ ...editForm, color: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Condition</Label>
@@ -674,10 +798,6 @@ export default function Inventory() {
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <Label>Marketing Name</Label>
-                <Input value={form.marketingName} onChange={(e) => setForm({ ...form, marketingName: e.target.value })} />
-              </div>
-              <div className="space-y-2">
                 <Label>Image URL</Label>
                 <Input
                   type="url"
@@ -685,10 +805,6 @@ export default function Inventory() {
                   value={form.imageUrl}
                   onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>SKU</Label>
-                <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Category</Label>
@@ -746,10 +862,6 @@ export default function Inventory() {
                 <Input value={form.storage} onChange={(e) => setForm({ ...form, storage: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Color</Label>
-                <Input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
-              </div>
-              <div className="space-y-2">
                 <Label>Unit Price (USD)</Label>
                 <Input
                   type="number"
@@ -788,29 +900,89 @@ export default function Inventory() {
       </Dialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] max-w-[95vw] sm:max-w-6xl">
           <DialogHeader>
-            <DialogTitle>Import Devices</DialogTitle>
+            <DialogTitle>Import devices from JSON</DialogTitle>
             <DialogDescription>
-              Upload multiple devices at once using JSON format.
+              Paste the <code>devices.json</code> payload, preview the variants, then publish to Firestore.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>Paste JSON payload</Label>
-            <Textarea
-              value={importPayload}
-              onChange={(e) => setImportPayload(e.target.value)}
-              className="min-h-[180px]"
-            />
-            <p className="text-xs text-muted-foreground">
-              Provide an array of devices or an object with a <code>devices</code> array.
-            </p>
+          <div className="flex flex-col gap-4 max-h-[70vh]">
+            <div className="space-y-2">
+              <Label>Paste JSON payload</Label>
+              <Textarea
+                value={importJson}
+                onChange={(e) => setImportJson(e.target.value)}
+                className="min-h-[240px] font-mono"
+                placeholder="[{ \"brand\": \"Iphone\", \"name\": \"IPHONE 12 PRO\", \"variants\": [...] }]"
+              />
+              <p className="text-xs text-muted-foreground">
+                Format matches <code>devices.json</code>: brand, name, imageUrl, category, and a <code>variants</code> array with storage, networkLockStatus, conditionGrade, unitPrice, and quantity.
+              </p>
+              {importError && <p className="text-sm text-destructive">{importError}</p>}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={handleConvertImport}>
+                Convert JSON to devices
+              </Button>
+              <Button variant="outline" onClick={() => setParsedImports([])}>
+                Clear preview
+              </Button>
+            </div>
+
+            {parsedImports.length > 0 && (
+              <div className="flex flex-col gap-3 overflow-hidden rounded-lg border bg-muted/40">
+                <div className="flex flex-col gap-2 border-b bg-background/70 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="font-medium">
+                    Ready to import {parsedImports.length} variant{parsedImports.length === 1 ? "" : "s"}.
+                  </div>
+                  <div className="text-muted-foreground">Sorted by brand, model, storage, carrier, and grade.</div>
+                </div>
+                <div className="max-h-[45vh] overflow-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="sticky top-0 bg-muted/60 text-left backdrop-blur">
+                      <tr>
+                        <th className="px-3 py-2 font-semibold">Brand</th>
+                        <th className="px-3 py-2 font-semibold">Model</th>
+                        <th className="px-3 py-2 font-semibold">Category</th>
+                        <th className="px-3 py-2 font-semibold">Storage</th>
+                        <th className="px-3 py-2 font-semibold">Carrier</th>
+                        <th className="px-3 py-2 font-semibold">Grade</th>
+                        <th className="px-3 py-2 font-semibold">Price</th>
+                        <th className="px-3 py-2 font-semibold">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedImports.map((device, idx) => (
+                        <tr key={`${device.brand}-${device.model}-${idx}`} className="border-t">
+                          <td className="px-3 py-2 font-medium">{device.brand}</td>
+                          <td className="px-3 py-2 uppercase">{device.model}</td>
+                          <td className="px-3 py-2">{device.category || "—"}</td>
+                          <td className="px-3 py-2">{device.storage || "—"}</td>
+                          <td className="px-3 py-2">{device.networkLockStatus || "—"}</td>
+                          <td className="px-3 py-2">{device.condition || "—"}</td>
+                          <td className="px-3 py-2">{typeof device.price === "number" ? `$${device.price.toFixed(2)}` : "—"}</td>
+                          <td className="px-3 py-2">{device.quantity ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-col gap-2 border-t bg-background/80 p-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                  <div className="text-sm text-muted-foreground sm:mr-auto">
+                    Preview is scrollable to keep actions visible while reviewing large imports.
+                  </div>
+                  <Button variant="outline" onClick={() => setParsedImports([])}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleConfirmImport} disabled={isImporting || !isAdmin}>
+                    {isImporting && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />} Confirm and import
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
       <Dialog open={deleteVariantDialogOpen} onOpenChange={setDeleteVariantDialogOpen}>
@@ -822,7 +994,14 @@ export default function Inventory() {
             </DialogDescription>
           </DialogHeader>
           <div>
-            <p>Are you sure you want to delete {deletingVariant ? `${deletingVariant.device.marketingName} (${deletingVariant.storage} ${deletingVariant.color})` : "this variant"}?</p>
+            <p>
+              Are you sure you want to delete
+              {" "}
+              {deletingVariant
+                ? `${deletingVariant.device.name || "this device"} (${deletingVariant.storage})`
+                : "this variant"}
+              ?
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteVariantDialogOpen(false)}>Cancel</Button>
