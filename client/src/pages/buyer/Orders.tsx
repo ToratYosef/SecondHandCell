@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { Package, Calendar, DollarSign, Truck } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
-import { UnifiedHeader } from "@/components/UnifiedHeader";
-import { PublicFooter } from "@/components/PublicFooter";
+import { BuyerLayout } from "@/components/BuyerLayout";
+import { PageShell } from "@/components/PageShell";
 
 export default function Orders() {
   const { data: orders, isLoading } = useQuery({
@@ -15,113 +15,104 @@ export default function Orders() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <UnifiedHeader />
-        <main className="flex-1 bg-muted/30">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="space-y-8">
-              <h1 className="text-3xl font-semibold tracking-tight text-center sm:text-left">My Orders</h1>
-              <div className="space-y-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-48 bg-muted rounded-md animate-pulse" />
-                ))}
-              </div>
-            </div>
+      <BuyerLayout>
+        <PageShell
+          title="My Orders"
+          description="View and track your order history"
+          className="mx-auto max-w-6xl"
+        >
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-48 rounded-md bg-muted animate-pulse" />
+            ))}
           </div>
-        </main>
-        <PublicFooter />
-      </div>
+        </PageShell>
+      </BuyerLayout>
     );
   }
 
-  const sortedOrders = Array.isArray(orders) ? [...orders].sort((a: any, b: any) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  ) : [];
+  const sortedOrders = Array.isArray(orders)
+    ? [...orders].sort(
+        (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+    : [];
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <UnifiedHeader />
-      <main className="flex-1 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="space-y-8">
-            <div className="text-center sm:text-left">
-              <h1 className="text-3xl font-semibold tracking-tight">My Orders</h1>
-              <p className="text-muted-foreground mt-1">View and track your order history</p>
-            </div>
-
-            {sortedOrders.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Package className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-2xl font-semibold mb-2">No orders yet</h2>
-            <p className="text-muted-foreground mb-6">Start browsing to place your first order</p>
-            <Button asChild data-testid="button-browse-catalog">
-              <Link href="/buyer/catalog">Browse Catalog</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {sortedOrders.map((order: any) => (
-            <Card key={order.id} data-testid={`order-card-${order.orderNumber}`}>
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-4">
+    <BuyerLayout>
+      <PageShell
+        title="My Orders"
+        description="View and track your order history"
+        className="mx-auto max-w-6xl"
+      >
+        {sortedOrders.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Package className="mb-4 h-16 w-16 text-muted-foreground" />
+              <h2 className="mb-2 text-2xl font-semibold">No orders yet</h2>
+              <p className="mb-6 text-muted-foreground">Start browsing to place your first order</p>
+              <Button asChild data-testid="button-browse-catalog">
+                <Link href="/buyer/catalog">Browse Catalog</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {sortedOrders.map((order: any) => (
+              <Card key={order.id}>
+                <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle className="text-xl">Order #{order.orderNumber}</CardTitle>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {new Date(order.createdAt).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        ${order.totalAmount}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={order.status} type="order" />
-                    <Button asChild variant="outline" data-testid={`button-view-${order.orderNumber}`}>
-                      <Link href={`/buyer/orders/${order.orderNumber}`}>View Details</Link>
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Payment Status</p>
-                    <StatusBadge status={order.paymentStatus} type="payment" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Fulfillment Status</p>
-                    <StatusBadge status={order.fulfillmentStatus} type="order" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Shipping Address</p>
-                    <p className="text-sm">
-                      {order.shippingAddress?.city}, {order.shippingAddress?.state}
+                    <CardTitle className="text-xl">Order #{order.id}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Placed on {new Date(order.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  {order.trackingNumber && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Tracking</p>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Truck className="h-4 w-4" />
-                        <span className="font-mono">{order.trackingNumber}</span>
-                      </div>
+                  <StatusBadge status={order.status} />
+                </CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-lg font-semibold">${order.totalAmount.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Items</p>
+                    <Badge variant="secondary">{order.items?.length || 0} items</Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Estimated Delivery</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>{new Date(order.estimatedDelivery).toLocaleDateString()}</span>
                     </div>
-                  )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Tracking</p>
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-muted-foreground" />
+                      <span>{order.trackingNumber || "Not available"}</span>
+                    </div>
+                  </div>
+                </CardContent>
+                <div className="border-t bg-muted/50 px-6 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <DollarSign className="h-4 w-4" />
+                      Paid via {order.paymentMethod || "Wire"}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" asChild>
+                        <Link href={`/buyer/orders/${order.id}`} data-testid={`button-view-order-${order.id}`}>
+                          View details
+                        </Link>
+                      </Button>
+                      <Button variant="secondary">Download invoice</Button>
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-              ))}
-            </div>
-          )}
+              </Card>
+            ))}
           </div>
-        </div>
-      </main>
-      <PublicFooter />
-    </div>
+        )}
+      </PageShell>
+    </BuyerLayout>
   );
 }

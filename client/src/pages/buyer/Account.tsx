@@ -83,24 +83,19 @@ export default function Account() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <UnifiedHeader />
-      <main className="flex-1 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <div className="text-center sm:text-left">
-                <h1 className="text-3xl font-bold" data-testid="text-page-title">Account</h1>
-                <p className="text-muted-foreground mt-1">Manage your account settings and information</p>
-              </div>
-              <div className="flex gap-2">
-                <Button asChild variant="outline" data-testid="button-edit-profile">
-                  <Link href="/buyer/account/edit">Edit Profile</Link>
-                </Button>
-                <Button asChild variant="outline" data-testid="button-change-password">
-                  <Link href="/buyer/account/password">Change Password</Link>
-                </Button>
-              </div>
+    <BuyerLayout>
+      <PageShell
+        title="Account"
+        description="Manage your account settings and information"
+        className="mx-auto max-w-6xl"
+      >
+        <div className="space-y-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-center sm:text-left">
+              <h1 className="text-3xl font-bold" data-testid="text-page-title">
+                Account
+              </h1>
+              <p className="text-muted-foreground mt-1">Manage your account settings and information</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -198,10 +193,37 @@ export default function Account() {
           </CardContent>
             </Card>
           </div>
-          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Account Status
+              </CardTitle>
+              <CardDescription>Your account verification and compliance status</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant={getStatusBadgeVariant(profile.status)} data-testid="badge-account-status">
+                  {formatStatus(profile.status)}
+                </Badge>
+                {profile.verifiedAt && (
+                  <span className="text-sm text-muted-foreground" data-testid="text-verified-at">
+                    Verified on {formatDate(new Date(profile.verifiedAt).toISOString())}
+                  </span>
+                )}
+              </div>
+
+              <Alert variant="default" className="border-dashed">
+                <AlertTitle>Keep your account current</AlertTitle>
+                <AlertDescription>
+                  Make sure your company details and documentation are up to date to maintain uninterrupted service.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
         </div>
-      </main>
-      <PublicFooter />
-    </div>
+      </PageShell>
+    </BuyerLayout>
   );
 }
