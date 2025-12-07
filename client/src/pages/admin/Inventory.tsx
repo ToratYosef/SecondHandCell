@@ -22,7 +22,6 @@ export default function Inventory() {
   const [editingVariant, setEditingVariant] = useState<any>(null);
   const [editForm, setEditForm] = useState({
     storage: "",
-    color: "",
     conditionGrade: "",
     networkLockStatus: "",
     unitPrice: "0",
@@ -51,7 +50,6 @@ export default function Inventory() {
   });
   const [filters, setFilters] = useState({
     brand: "",
-    color: "",
     condition: "",
     stock: "all",
   });
@@ -173,7 +171,6 @@ export default function Inventory() {
     setEditingVariant(variant);
     setEditForm({
       storage: variant.storage || "",
-      color: variant.color || "",
       conditionGrade: variant.conditionGrade || "",
       networkLockStatus: variant.networkLockStatus || "",
       unitPrice: typeof variant.unitPrice === "number" ? variant.unitPrice.toString() : "0",
@@ -190,7 +187,6 @@ export default function Inventory() {
       id: editingVariant.id,
       payload: {
         storage: editForm.storage,
-        color: editForm.color,
         conditionGrade: editForm.conditionGrade,
         networkLockStatus: editForm.networkLockStatus,
         unitPrice: parseFloat(editForm.unitPrice || "0"),
@@ -220,30 +216,24 @@ export default function Inventory() {
       device: {
         brand: device.brand,
         name: device.name,
-        marketingName: device.marketingName,
-        sku: device.sku,
       },
       unitPrice: variant.priceTiers?.[0]?.unitPrice,
     }))
   ) || [];
 
   const brandOptions = Array.from(new Set(devices?.map((d: any) => d.brand) || [])).filter(Boolean);
-  const colorOptions = Array.from(new Set(allVariants.map((v: any) => v.color) || [])).filter(Boolean);
   const conditionOptions = Array.from(new Set(allVariants.map((v: any) => v.conditionGrade) || [])).filter(Boolean);
 
   const filteredVariants = allVariants.filter((variant: any) => {
     const searchLower = searchTerm.toLowerCase();
-    const marketingNameLower = (variant.device.marketingName || variant.device.name || "").toLowerCase();
+    const nameLower = (variant.device.name || "").toLowerCase();
     const matchesSearch =
-      marketingNameLower.includes(searchLower) ||
+      nameLower.includes(searchLower) ||
       (variant.device.brand || "").toLowerCase().includes(searchLower) ||
-      (variant.device.sku || "").toLowerCase().includes(searchLower) ||
-      (variant.storage || "").toLowerCase().includes(searchLower) ||
-      (variant.color || "").toLowerCase().includes(searchLower);
+      (variant.storage || "").toLowerCase().includes(searchLower);
 
-      const matchesBrand = filters.brand === "all" || !filters.brand || variant.device.brand === filters.brand;
-      const matchesColor = filters.color === "all" || !filters.color || variant.color === filters.color;
-      const matchesCondition = filters.condition === "all" || !filters.condition || variant.conditionGrade === filters.condition;
+    const matchesBrand = filters.brand === "all" || !filters.brand || variant.device.brand === filters.brand;
+    const matchesCondition = filters.condition === "all" || !filters.condition || variant.conditionGrade === filters.condition;
     const quantity = variant.inventory?.quantityAvailable ?? 0;
     const matchesStock =
       filters.stock === "all" ||
@@ -251,7 +241,7 @@ export default function Inventory() {
       (filters.stock === "out" && quantity === 0) ||
       (filters.stock === "in" && quantity >= 20);
 
-    return matchesSearch && matchesBrand && matchesColor && matchesCondition && matchesStock;
+    return matchesSearch && matchesBrand && matchesCondition && matchesStock;
   });
 
   const lowStockVariants = allVariants.filter((v: any) => 
@@ -280,7 +270,7 @@ export default function Inventory() {
 
   // Group variants by device title (brand + name + storage)
   const groups = allVariants.reduce((acc: any, v: any) => {
-    const displayName = v.device.marketingName || v.device.name || v.device.modelName || "";
+    const displayName = v.device.name || v.device.modelName || "";
     const title = `${v.device.brand} ${displayName} ${v.storage}`.trim();
     if (!acc[title]) acc[title] = [];
     acc[title].push(v);
@@ -428,20 +418,6 @@ export default function Inventory() {
                 </SelectContent>
               </Select>
 
-              <Select value={filters.color} onValueChange={(value) => setFilters({ ...filters, color: value })}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Color" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Colors</SelectItem>
-                  {colorOptions.map((color) => (
-                    <SelectItem key={color} value={color}>
-                      {color}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
               <Select value={filters.condition} onValueChange={(value) => setFilters({ ...filters, condition: value })}>
                 <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Condition" />
@@ -471,7 +447,7 @@ export default function Inventory() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setFilters({ brand: "", color: "", condition: "", stock: "all" })}
+                onClick={() => setFilters({ brand: "", condition: "", stock: "all" })}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Reset
@@ -490,19 +466,17 @@ export default function Inventory() {
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
                     {(() => {
-                      const displayName = variant.device?.marketingName || variant.device?.name || variant.device?.modelName;
+                      const displayName = variant.device?.name || variant.device?.modelName;
                       return (
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <Badge variant="outline">{variant.device.brand}</Badge>
                           <h3 className="font-semibold">{displayName}</h3>
                           <Badge variant="secondary">{variant.storage}</Badge>
-                          <Badge variant="secondary">{variant.color}</Badge>
                           <ConditionBadge grade={variant.conditionGrade} />
                         </div>
                       );
                     })()}
                     <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                      {variant.device?.sku && <span>SKU: {variant.device.sku}</span>}
                       <span>Network: {variant.networkLockStatus}</span>
                       <span>Min order: {variant.inventory?.minOrderQuantity ?? 1}</span>
                       {typeof variant.unitPrice === "number" && (
@@ -580,10 +554,6 @@ export default function Inventory() {
               <div className="space-y-2">
                 <Label>Storage</Label>
                 <Input value={editForm.storage} onChange={(e) => setEditForm({ ...editForm, storage: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Input value={editForm.color} onChange={(e) => setEditForm({ ...editForm, color: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Condition</Label>
@@ -815,7 +785,7 @@ export default function Inventory() {
               Are you sure you want to delete
               {" "}
               {deletingVariant
-                ? `${deletingVariant.device.marketingName || deletingVariant.device.name || "this device"} (${deletingVariant.storage} ${deletingVariant.color})`
+                ? `${deletingVariant.device.name || "this device"} (${deletingVariant.storage})`
                 : "this variant"}
               ?
             </p>
