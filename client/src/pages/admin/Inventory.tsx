@@ -237,11 +237,27 @@ export default function Inventory() {
   const handleConvertImport = () => {
     try {
       const parsed = parseDeviceJson(importJson);
-      setParsedImports(parsed);
+      const sorted = [...parsed].sort((a, b) => {
+        const brandCompare = a.brand.localeCompare(b.brand);
+        if (brandCompare !== 0) return brandCompare;
+
+        const modelCompare = a.model.localeCompare(b.model);
+        if (modelCompare !== 0) return modelCompare;
+
+        const storageCompare = (a.storage || "").localeCompare(b.storage || "");
+        if (storageCompare !== 0) return storageCompare;
+
+        const lockCompare = (a.networkLockStatus || "").localeCompare(b.networkLockStatus || "");
+        if (lockCompare !== 0) return lockCompare;
+
+        return (a.condition || "").localeCompare(b.condition || "");
+      });
+
+      setParsedImports(sorted);
       setImportError(null);
       toast({
         title: "Payload converted",
-        description: `Ready to import ${parsed.length} variant${parsed.length === 1 ? "" : "s"}.`,
+        description: `Ready to import ${sorted.length} variant${sorted.length === 1 ? "" : "s"}.`,
       });
     } catch (error: any) {
       setParsedImports([]);
@@ -884,21 +900,21 @@ export default function Inventory() {
       </Dialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] max-w-[95vw] sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Import devices from JSON</DialogTitle>
             <DialogDescription>
               Paste the <code>devices.json</code> payload, preview the variants, then publish to Firestore.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4 max-h-[70vh]">
             <div className="space-y-2">
               <Label>Paste JSON payload</Label>
               <Textarea
                 value={importJson}
                 onChange={(e) => setImportJson(e.target.value)}
-                className="min-h-[200px] font-mono"
-                placeholder='[{ "brand": "Iphone", "name": "IPHONE 12 PRO", "variants": [...] }]'
+                className="min-h-[240px] font-mono"
+                placeholder="[{ \"brand\": \"Iphone\", \"name\": \"IPHONE 12 PRO\", \"variants\": [...] }]"
               />
               <p className="text-xs text-muted-foreground">
                 Format matches <code>devices.json</code>: brand, name, imageUrl, category, and a <code>variants</code> array with storage, networkLockStatus, conditionGrade, unitPrice, and quantity.
@@ -916,16 +932,20 @@ export default function Inventory() {
             </div>
 
             {parsedImports.length > 0 && (
-              <div className="space-y-3">
-                <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                  Ready to import {parsedImports.length} variant{parsedImports.length === 1 ? "" : "s"}.
+              <div className="flex flex-col gap-3 overflow-hidden rounded-lg border bg-muted/40">
+                <div className="flex flex-col gap-2 border-b bg-background/70 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="font-medium">
+                    Ready to import {parsedImports.length} variant{parsedImports.length === 1 ? "" : "s"}.
+                  </div>
+                  <div className="text-muted-foreground">Sorted by brand, model, storage, carrier, and grade.</div>
                 </div>
-                <div className="overflow-x-auto rounded-md border">
+                <div className="max-h-[45vh] overflow-auto">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-muted/60 text-left">
+                    <thead className="sticky top-0 bg-muted/60 text-left backdrop-blur">
                       <tr>
                         <th className="px-3 py-2 font-semibold">Brand</th>
-                        <th className="px-3 py-2 font-semibold">Device</th>
+                        <th className="px-3 py-2 font-semibold">Model</th>
+                        <th className="px-3 py-2 font-semibold">Category</th>
                         <th className="px-3 py-2 font-semibold">Storage</th>
                         <th className="px-3 py-2 font-semibold">Carrier</th>
                         <th className="px-3 py-2 font-semibold">Grade</th>
@@ -936,8 +956,9 @@ export default function Inventory() {
                     <tbody>
                       {parsedImports.map((device, idx) => (
                         <tr key={`${device.brand}-${device.model}-${idx}`} className="border-t">
-                          <td className="px-3 py-2">{device.brand}</td>
-                          <td className="px-3 py-2 font-medium uppercase">{device.model}</td>
+                          <td className="px-3 py-2 font-medium">{device.brand}</td>
+                          <td className="px-3 py-2 uppercase">{device.model}</td>
+                          <td className="px-3 py-2">{device.category || "—"}</td>
                           <td className="px-3 py-2">{device.storage || "—"}</td>
                           <td className="px-3 py-2">{device.networkLockStatus || "—"}</td>
                           <td className="px-3 py-2">{device.condition || "—"}</td>
@@ -948,7 +969,10 @@ export default function Inventory() {
                     </tbody>
                   </table>
                 </div>
-                <div className="flex items-center justify-end gap-3">
+                <div className="flex flex-col gap-2 border-t bg-background/80 p-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                  <div className="text-sm text-muted-foreground sm:mr-auto">
+                    Preview is scrollable to keep actions visible while reviewing large imports.
+                  </div>
                   <Button variant="outline" onClick={() => setParsedImports([])}>
                     Cancel
                   </Button>
