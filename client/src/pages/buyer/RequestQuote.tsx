@@ -84,7 +84,7 @@ export default function RequestQuote() {
     setItems([...items, {
       deviceVariantId: selectedVariant,
       quantity,
-      deviceName: device?.marketingName || device?.brand + " " + device?.name,
+      deviceName: device ? `${device.brand} ${device.name}` : "",
       variantDetails: `${variant?.storage} | ${variant?.color} | Grade ${variant?.conditionGrade}`,
     }]);
 
@@ -144,7 +144,7 @@ export default function RequestQuote() {
                   ) : (
                     devices?.map((device: any) => (
                       <SelectItem key={device.id} value={device.id}>
-                        {device.marketingName || `${device.brand} ${device.name}`}
+                        {`${device.brand} ${device.name}`}
                       </SelectItem>
                     ))
                   )}

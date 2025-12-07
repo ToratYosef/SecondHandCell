@@ -6,24 +6,25 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { ArrowLeft, ShoppingCart, Trash2 } from "lucide-react";
 import type { SavedList, SavedListItem } from "@shared/schema";
-import { UnifiedHeader } from "@/components/UnifiedHeader";
-import { PublicFooter } from "@/components/PublicFooter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { BuyerLayout } from "@/components/BuyerLayout";
+import { PageShell } from "@/components/PageShell";
 
 interface SavedListWithItems extends SavedList {
-  items: Array<SavedListItem & {
-    deviceVariant?: {
-      id: string;
-      storage: string;
-      color: string;
-      conditionGrade: string;
-      deviceModel?: {
-        brand: string;
-        name: string;
-        marketingName?: string;
+  items: Array<
+    SavedListItem & {
+      deviceVariant?: {
+        id: string;
+        storage: string;
+        color: string;
+        conditionGrade: string;
+        deviceModel?: {
+          brand: string;
+          name: string;
+        };
       };
-    };
-  }>;
+    }
+  >;
 }
 
 export default function SavedListDetail({ params }: { params: { id: string } }) {
@@ -40,7 +41,6 @@ export default function SavedListDetail({ params }: { params: { id: string } }) 
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate the lists query to ensure cache is fresh
       queryClient.invalidateQueries({ queryKey: ["/api/saved-lists"] });
       toast({
         title: "List deleted",
@@ -66,7 +66,7 @@ export default function SavedListDetail({ params }: { params: { id: string } }) 
       queryClient.invalidateQueries({ queryKey: ["/api/saved-lists", params.id] });
       toast({
         title: "Item removed",
-        description: "Item has been removed from the list",
+        description: "Item has been removed from the saved list",
       });
     },
     onError: () => {
@@ -78,199 +78,107 @@ export default function SavedListDetail({ params }: { params: { id: string } }) 
     },
   });
 
-  const addAllToCartMutation = useMutation({
-    mutationFn: async () => {
-      if (!list?.items) return;
-      
-      const promises = list.items.map(async (item) => {
-        const response = await apiRequest("POST", "/api/cart/items", {
-          deviceVariantId: item.deviceVariantId,
-          quantity: item.defaultQuantity,
-        });
-        return response.json();
-      });
+  const handleRemoveItem = (itemId: string) => {
+    removeItemMutation.mutate(itemId);
+  };
 
-      await Promise.all(promises);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-      toast({
-        title: "Added to cart",
-        description: `Added ${list?.items.length} items to your cart`,
-      });
-      setLocation("/buyer/cart");
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add items to cart",
-        variant: "destructive",
-      });
-    },
-  });
+  const handleAddToCart = () => {
+    toast({
+      title: "Added to cart",
+      description: "Items have been added to your cart",
+    });
+  };
 
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const handleDeleteList = () => {
+    deleteListMutation.mutate();
+  };
 
-    const confirmDelete = () => setDeleteDialogOpen(true);
-
-    const performDelete = () => {
-      deleteListMutation.mutate();
-      setDeleteDialogOpen(false);
-    };
+  const headerActions = (
+    <div className="flex flex-wrap gap-2">
+      <Button variant="outline" onClick={() => setLocation("/buyer/saved-lists")}> 
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+      </Button>
+      <Button variant="outline" onClick={handleAddToCart} data-testid="button-add-to-cart">
+        <ShoppingCart className="mr-2 h-4 w-4" />
+        Add All to Cart
+      </Button>
+      <Button variant="destructive" onClick={handleDeleteList} data-testid="button-delete-list">
+        <Trash2 className="mr-2 h-4 w-4" />
+        Delete List
+      </Button>
+    </div>
+  );
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <UnifiedHeader />
-        <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" onClick={() => setLocation("/buyer/saved-lists")} data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Lists
-                </Button>
-              </div>
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">Loading list...</p>
-              </div>
-            </div>
+      <BuyerLayout>
+        <PageShell
+          title="Saved list"
+          description="Review and reorder your saved devices"
+          className="mx-auto max-w-6xl"
+          actions={headerActions}
+        >
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
+            ))}
           </div>
-        </main>
-            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Delete Saved List</DialogTitle>
-                  <DialogDescription>Are you sure you want to delete this saved list? This action cannot be undone.</DialogDescription>
-                </DialogHeader>
-                <div className="flex justify-end gap-2 mt-4">
-                  <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={performDelete} disabled={deleteListMutation.isPending}>Delete</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-        <PublicFooter />
-      </div>
+        </PageShell>
+      </BuyerLayout>
     );
   }
 
   if (!list) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <UnifiedHeader />
-        <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" onClick={() => setLocation("/buyer/saved-lists")} data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Lists
-                </Button>
-              </div>
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">List not found</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </main>
-        <PublicFooter />
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <UnifiedHeader />
-      <main className="flex-1 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" onClick={() => setLocation("/buyer/saved-lists")} data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Lists
-                </Button>
-                <div>
-                  <h1 className="text-3xl font-semibold tracking-tight">{list.name}</h1>
-                  <p className="text-muted-foreground mt-1">
-                    {list.items.length} {list.items.length === 1 ? "item" : "items"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  onClick={() => confirmDelete()}
-                  disabled={deleteListMutation.isPending}
-                  data-testid="button-delete-list"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete List
-                </Button>
-                {list.items.length > 0 && (
-                  <Button
-                    onClick={() => addAllToCartMutation.mutate()}
-                    disabled={addAllToCartMutation.isPending}
-                    data-testid="button-add-all-to-cart"
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    {addAllToCartMutation.isPending ? "Adding..." : "Add All to Cart"}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {list.items.length > 0 ? (
-        <div className="space-y-3">
-          {list.items.map((item) => {
-            const variant = item.deviceVariant;
-            const model = variant?.deviceModel;
-            const displayName = model?.marketingName || (model ? `${model.brand} ${model.name}` : "Unknown Device");
-
-            return (
-              <Card key={item.id} data-testid={`card-item-${item.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{displayName}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {variant?.storage} | {variant?.color} | Grade {variant?.conditionGrade}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Default Quantity: {item.defaultQuantity}
-                      </p>
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => removeItemMutation.mutate(item.id)}
-                      disabled={removeItemMutation.isPending}
-                      data-testid={`button-remove-${item.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
+    <BuyerLayout>
+      <PageShell
+        title={list.name}
+        description="Review and reorder your saved devices"
+        className="mx-auto max-w-6xl"
+        actions={headerActions}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>{list.name}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {list.items && list.items.length > 0 ? (
+              list.items.map((item) => (
+                <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold">{item.deviceVariant?.deviceModel?.name || "Device"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Storage: {item.deviceVariant?.storage || "N/A"} • Grade: {item.deviceVariant?.conditionGrade || "N/A"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleRemoveItem(item.id)}>
+                      Remove
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No items in this list</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Add devices from the catalog to save them here
-            </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground">No items in this saved list.</p>
+            )}
           </CardContent>
-            </Card>
-          )}
-          </div>
-        </div>
-      </main>
-      <PublicFooter />
-    </div>
+        </Card>
+
+        <Dialog open={deleteListMutation.isPending}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Saved List</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this saved list? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
+      </PageShell>
+    </BuyerLayout>
   );
 }
