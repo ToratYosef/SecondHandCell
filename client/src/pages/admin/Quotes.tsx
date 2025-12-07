@@ -252,7 +252,7 @@ export default function AdminQuotes() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-medium">
-                            {item.model?.marketingName || `${item.model?.brand} ${item.model?.name}`}
+                            {`${item.model?.brand} ${item.model?.name}`}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {item.variant?.storage} | {item.variant?.color} | Grade {item.variant?.conditionGrade}

@@ -50,6 +50,7 @@ import AdminOrders from "@/pages/admin/Orders";
 import AdminUsers from "@/pages/admin/Users";
 import AdminSettings from "@/pages/admin/Settings";
 import AdminReports from "@/pages/admin/Reports";
+import Applications from "@/pages/admin/Applications";
 
 function Router() {
   return (
@@ -202,6 +203,15 @@ function Router() {
           <ProtectedRoute requiredRole="admin">
             <AdminLayout>
               <Inventory />
+            </AdminLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/admin/applications">
+        {() => (
+          <ProtectedRoute requiredRole="admin">
+            <AdminLayout>
+              <Applications />
             </AdminLayout>
           </ProtectedRoute>
         )}
