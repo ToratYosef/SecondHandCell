@@ -1,4 +1,3 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,14 +12,17 @@ import {
   FileCheck,
   BarChart,
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useFirebaseUser } from "@/hooks/useFirebaseUser";
+import { Badge } from "@/components/ui/badge";
 
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+  { name: "Catalog", href: "/admin/inventory", icon: Package },
   { name: "Companies", href: "/admin/companies", icon: Building2 },
-    { name: "Reports", href: "/admin/reports", icon: BarChart },
-  { name: "Inventory", href: "/admin/inventory", icon: Package },
+  { name: "Reports", href: "/admin/reports", icon: BarChart },
   { name: "Orders", href: "/admin/orders", icon: FileText },
   { name: "Quotes", href: "/admin/quotes", icon: FileCheck },
   { name: "Users", href: "/admin/users", icon: Users },
@@ -30,16 +32,11 @@ const navigation = [
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { data: user } = useQuery<{ id: string; name: string; email: string; role: string }>({
-    queryKey: ["/api/me"],
-  });
+  const { profile } = useFirebaseUser();
 
   const handleLogout = async () => {
     try {
-      await apiRequest("POST", "/api/auth/logout");
-      queryClient.clear();
+      await signOut(auth);
       setLocation("/login");
       toast({
         title: "Logged out",
@@ -55,21 +52,19 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   };
 
   const SidebarContent = () => (
-    <div className="flex items-center gap-4 overflow-x-auto py-2">
+    <div className="flex items-center gap-2 overflow-x-auto py-2">
       {navigation.map((item) => {
         const isActive = location === item.href || location.startsWith(item.href + "/");
         return (
           <Link key={item.name} href={item.href}>
             <Button
               variant={isActive ? "secondary" : "ghost"}
-              className={cn(
-                "justify-start",
-                isActive && "bg-accent"
-              )}
+              className={cn("justify-start", isActive && "bg-accent")}
               data-testid={`nav-${item.name.toLowerCase().replace(" ", "-")}`}
             >
               <item.icon className="mr-2 h-4 w-4" />
               {item.name}
+              {item.name === "Catalog" && <Badge className="ml-2" variant="outline">Public</Badge>}
             </Button>
           </Link>
         );
@@ -85,16 +80,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Admin Portal</p>
-                <p className="text-lg font-semibold leading-tight">{user?.name || "Admin User"}</p>
+                <p className="text-lg font-semibold leading-tight">{profile?.name || "Workspace"}</p>
+                <p className="text-xs text-muted-foreground">{profile?.email || "Sign in to sync access"}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                className="justify-start"
-                onClick={handleLogout}
-                data-testid="button-logout"
-              >
+              <Button variant="ghost" className="justify-start" onClick={handleLogout} data-testid="button-logout">
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
@@ -106,9 +97,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-screen-xl px-4 py-6 md:py-8">
-        {children}
-      </main>
+      <main className="mx-auto w-full max-w-screen-xl px-4 py-6 md:py-8">{children}</main>
     </div>
   );
 }
