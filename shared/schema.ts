@@ -16,7 +16,7 @@ export const companyUserRoleEnum = ["owner", "admin", "buyer"] as const;
 export const conditionGradeEnum = ["A", "B", "C", "D"] as const;
 export const networkLockStatusEnum = ["unlocked", "locked", "other"] as const;
 export const inventoryStatusEnum = ["in_stock", "reserved", "incoming", "discontinued"] as const;
-export const orderStatusEnum = ["pending_payment", "payment_review", "processing", "shipped", "completed", "cancelled"] as const;
+export const orderStatusEnum = ["pending_payment", "payment_review", "processing", "shipped", "completed", "cancelled", "reoffer_sent"] as const;
 export const paymentStatusEnum = ["unpaid", "paid", "partially_paid", "refunded"] as const;
 export const paymentMethodEnum = ["card", "wire", "ach", "terms", "other"] as const;
 export const quoteStatusEnum = ["draft", "sent", "accepted", "rejected", "expired"] as const;
@@ -260,6 +260,9 @@ export const orders = sqliteTable("orders", {
   billingAddressId: text("billing_address_id").references(() => billingAddresses.id),
   notesInternal: text("notes_internal"),
   notesCustomer: text("notes_customer"),
+  trackingNumber: text("tracking_number"),
+  reofferAmount: text("reoffer_amount"),
+  reofferReason: text("reoffer_reason"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
