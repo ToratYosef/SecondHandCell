@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,30 +8,67 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { db } from "@/lib/firebase";
+import { collection, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 import { format } from "date-fns";
-import { Users, Search, Shield, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Search, Shield, ShieldCheck, ShieldAlert } from "lucide-react";
 import type { User } from "@shared/schema";
+
+type AdminUser = User & {
+  isActive?: boolean;
+  lastLoginAt?: string | number | Date;
+};
 
 export default function AdminUsers() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [newRole, setNewRole] = useState("");
   const [isActive, setIsActive] = useState(true);
 
-  const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ["/api/admin/users"],
-  });
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const usersRef = collection(db, "users");
+    const usersQuery = query(usersRef, orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
+      const docs = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        const createdAt = (data.createdAt as any)?.toDate?.() ?? data.createdAt;
+        const lastLoginAt = (data.lastLoginAt as any)?.toDate?.() ?? data.lastLoginAt;
+
+        return {
+          id: docSnap.id,
+          name: data.name ?? "Unknown",
+          email: data.email ?? "",
+          role: data.role ?? "buyer",
+          companyName: data.companyName ?? null,
+          createdAt,
+          lastLoginAt,
+          isActive: data.isActive ?? true,
+        } as AdminUser;
+      });
+
+      setUsers(docs);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, role, isActive }: { id: string; role?: string; isActive?: boolean }) => {
-      return await apiRequest("PATCH", `/api/admin/users/${id}`, { role, isActive });
+      const ref = doc(db, "users", id);
+      const updates: Record<string, unknown> = {};
+      if (role !== undefined) updates.role = role;
+      if (isActive !== undefined) updates.isActive = isActive;
+      await updateDoc(ref, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({
         title: "User updated",
         description: "User has been updated successfully",
