@@ -1,139 +1,416 @@
-import { AdminLayout } from "@/components/AdminLayout";
+import { useMemo, useState } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { CheckCircle2, ShieldAlert } from "lucide-react";
-
-const statCards = [
-  { title: "New buyers", value: "28", change: "+6 vs last week", tone: "positive" },
-  { title: "Pending reviews", value: "12", change: "Need compliance checks", tone: "warning" },
-  { title: "Open orders", value: "94", change: "$482k in pipeline", tone: "neutral" },
-  { title: "Tickets", value: "7", change: "2 escalations", tone: "warning" },
-];
-
-const revenueData = [
-  { name: "Mon", value: 120 },
-  { name: "Tue", value: 180 },
-  { name: "Wed", value: 260 },
-  { name: "Thu", value: 220 },
-  { name: "Fri", value: 310 },
-];
-
-const queue = [
-  { title: "Review PO-2298", detail: "LTL freight routing", badge: "Logistics" },
-  { title: "Compliance - New buyer", detail: "Verify resale certificate", badge: "Compliance" },
-  { title: "Restock laptops", detail: "Sync Dallas and Newark counts", badge: "Inventory" },
-];
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useCatalog } from "@/hooks/useCatalog";
+import { AuthOverlay } from "@/components/AuthOverlay";
+import { useFirebaseUser } from "@/hooks/useFirebaseUser";
+import { collection, doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Loader2, Plus } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
+  const { items, summary, loading } = useCatalog();
+  const { isAdmin, profile } = useFirebaseUser();
+  const { toast } = useToast();
+  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [newItem, setNewItem] = useState({ model: "", brand: "", storage: "", condition: "", price: "" });
+  const [isSaving, setSaving] = useState(false);
+  const [importJson, setImportJson] = useState(
+    `[
+  { "brand": "Iphone", "device": "IPHONE 12 PRO", "slug": "12-pro", "storages": ["128GB", "256GB", "512GB"] }
+]`
+  );
+  const [parsedDevices, setParsedDevices] = useState<ParsedDevice[]>([]);
+  const [isImporting, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const latestItems = useMemo(() => items.slice(0, 5), [items]);
+
+  const handleCreate = async () => {
+    setSaving(true);
+    const ref = doc(collection(db, "catalog"));
+    await setDoc(ref, {
+      ...newItem,
+      price: Number(newItem.price) || 0,
+      status: "live",
+      updatedAt: serverTimestamp(),
+      createdBy: profile?.email ?? "",
+    });
+    setSaving(false);
+    setDialogOpen(false);
+    setNewItem({ model: "", brand: "", storage: "", condition: "", price: "" });
+  };
+
+  const handleConvertJson = () => {
+    try {
+      const parsed = parseDevicePayload(importJson);
+      setParsedDevices(parsed);
+      setImportError(null);
+      toast({
+        title: "Payload converted",
+        description: `Ready to import ${parsed.length} model${parsed.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error: any) {
+      setParsedDevices([]);
+      setImportError(error.message || "Unable to parse JSON payload");
+      toast({
+        title: "Invalid JSON",
+        description: error.message || "Follow the devices.json format and try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImportDevices = async () => {
+    if (!isAdmin) {
+      toast({ title: "Admin required", description: "Sign in as an admin to import devices." });
+      return;
+    }
+
+    if (parsedDevices.length === 0) {
+      toast({ title: "Nothing to import", description: "Convert JSON to devices first." });
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const batch = writeBatch(db);
+      parsedDevices.forEach((device) => {
+        const storages = device.storages.length > 0 ? device.storages : [""];
+        storages.forEach((storage) => {
+          const ref = doc(collection(db, "catalog"));
+          batch.set(ref, {
+            brand: device.brand,
+            model: device.device,
+            slug: device.slug,
+            storage: storage || undefined,
+            condition: "Unspecified",
+            price: 0,
+            status: "live",
+            updatedAt: serverTimestamp(),
+            createdBy: profile?.email ?? "",
+          });
+        });
+      });
+
+      await batch.commit();
+      toast({ title: "Import complete", description: `${parsedDevices.length} model(s) published to Firestore.` });
+      setParsedDevices([]);
+      setImportJson("");
+    } catch (error: any) {
+      toast({
+        title: "Import failed",
+        description: error.message || "Could not save devices to Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
-    <AdminLayout>
-      <PageShell
-        title="Admin control center"
-        description="Track onboarding, orders, and platform health in one view."
-        badge="Admin"
-        actions={<Button asChild><a href="/admin/reports">Open reports</a></Button>}
-      >
-        <div className="grid gap-4 lg:grid-cols-4">
-          {statCards.map((stat) => (
-            <Card key={stat.title} className="hover-elevate">
-              <CardHeader className="pb-2">
-                <CardDescription>{stat.title}</CardDescription>
-                <CardTitle className="text-3xl">{stat.value}</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">{stat.change}</CardContent>
-            </Card>
-          ))}
-        </div>
+    <PageShell
+      title="Catalog workspace"
+      description="Track live catalog activity and publish updates from one view."
+      badge="Admin"
+      actions={
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Add catalog item
+        </Button>
+      }
+    >
+      {!isAdmin && <AuthOverlay title="Admin access required" description="Sign in to manage the catalog." />}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Revenue pace</CardTitle>
-                <CardDescription>Trailing 7 days across all warehouses</CardDescription>
-              </div>
-              <Badge variant="outline">Live</Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueData}>
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                    <Tooltip cursor={{ fill: "hsl(var(--muted))" }} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={8} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <StatCard title="Live items" value={loading ? "–" : summary.total.toString()} hint="Active listings" />
+        <StatCard title="Brands" value={loading ? "–" : summary.brands.toString()} hint="Unique brands" />
+        <StatCard title="Avg. price" value={loading ? "–" : `$${summary.avgPrice.toFixed(2)}`} hint="Per item" />
+      </div>
 
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <CardTitle>Latest updates</CardTitle>
+              <CardDescription>Recent catalog changes pushed to buyers</CardDescription>
+            </div>
+            <Badge variant="outline">Realtime</Badge>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {loading ? (
+              <div className="flex h-40 items-center justify-center text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading catalog
+              </div>
+            ) : latestItems.length === 0 ? (
+              <EmptyState />
+            ) : (
+              latestItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="font-semibold">{item.model}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {[item.brand, item.storage, item.condition].filter(Boolean).join(" • ") || "Unspecified"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{item.price ? `$${item.price.toFixed(2)}` : "Price TBC"}</p>
+                    <Badge variant={item.status === "live" ? "secondary" : "outline"}>{item.status || "draft"}</Badge>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Activity</CardTitle>
+            <CardDescription>Who last touched the catalog</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {loading ? (
+              <div className="flex items-center text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing activity
+              </div>
+            ) : latestItems.length === 0 ? (
+              <EmptyState />
+            ) : (
+              latestItems.map((item) => (
+                <div key={item.id} className="rounded-lg bg-muted/60 p-3">
+                  <p className="text-sm font-semibold">{item.model}</p>
+                  <p className="text-xs text-muted-foreground">Updated {item.updatedAt ? new Date(item.updatedAt as any).toLocaleString() : "just now"}</p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="catalog" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="catalog">Catalog</TabsTrigger>
+          <TabsTrigger value="rules">Quality rules</TabsTrigger>
+        </TabsList>
+        <TabsContent value="catalog">
           <Card>
             <CardHeader>
-              <CardTitle>Ops queue</CardTitle>
-              <CardDescription>Prioritize what needs action</CardDescription>
+              <CardTitle>All catalog items</CardTitle>
+              <CardDescription>Live view of what buyers can see</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {queue.map((item) => (
-                <div key={item.title} className="rounded-xl border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold">{item.title}</p>
-                    <Badge variant="secondary">{item.badge}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{item.detail}</p>
+            <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {loading ? (
+                <div className="col-span-full flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading catalog
                 </div>
-              ))}
-              <Button variant="ghost" className="w-full" asChild>
-                <a href="/admin/orders">View all tasks</a>
-              </Button>
+              ) : items.length === 0 ? (
+                <EmptyState />
+              ) : (
+                items.map((item) => (
+                  <Card key={item.id} className="border-dashed">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">{item.model}</CardTitle>
+                      <CardDescription>
+                        {[item.brand, item.storage, item.condition].filter(Boolean).join(" • ") || "Unspecified"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between text-sm">
+                      <Badge variant="secondary">{item.status || "draft"}</Badge>
+                      <span className="font-semibold">{item.price ? `$${item.price.toFixed(2)}` : "TBD"}</span>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </CardContent>
           </Card>
-        </div>
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Bulk import from JSON</CardTitle>
+              <CardDescription>Paste the devices.json payload to preview and publish to Firestore.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>JSON payload</Label>
+                <Textarea
+                  value={importJson}
+                  onChange={(e) => setImportJson(e.target.value)}
+                  className="min-h-[200px] font-mono"
+                  placeholder="Paste the contents of devices.json here"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Accepts the same array structure as devices.json (brand, device, slug, storages).
+                </p>
+                {importError && <p className="text-sm text-destructive">{importError}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={handleConvertJson}>
+                  Convert JSON to devices
+                </Button>
+                <Button variant="outline" onClick={() => setParsedDevices([])}>
+                  Clear preview
+                </Button>
+              </div>
 
-        <Tabs defaultValue="buyers" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="buyers">Buyer approvals</TabsTrigger>
-            <TabsTrigger value="quality">Quality alerts</TabsTrigger>
-            <TabsTrigger value="shipments">Shipments</TabsTrigger>
-          </TabsList>
-          <TabsContent value="buyers" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { name: "Northpoint Mobile", status: "Pending docs" },
-              { name: "Atlas Wireless", status: "Manual review" },
-              { name: "Bluefin Traders", status: "Approved" },
-            ].map((buyer) => (
-              <Card key={buyer.name}>
-                <CardHeader>
-                  <CardTitle className="text-lg">{buyer.name}</CardTitle>
-                  <Badge variant="secondary">{buyer.status}</Badge>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Reseller documentation stored. Net terms pending.
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-          <TabsContent value="quality" className="space-y-3">
-            {["Zero DOA in last 7 days", "2 RMAs pending inspection"].map((note) => (
-              <Card key={note} className="flex items-center gap-3 border-dashed p-4">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                <p className="text-sm">{note}</p>
-              </Card>
-            ))}
-          </TabsContent>
-          <TabsContent value="shipments" className="space-y-3">
-            {["Dallas outbound capacity at 78%", "Newark inbound 2 pallets arriving"].map((update) => (
-              <Card key={update} className="flex items-center gap-3 p-4">
-                <ShieldAlert className="h-5 w-5 text-amber-600" />
-                <p className="text-sm">{update}</p>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
-      </PageShell>
-    </AdminLayout>
+              {parsedDevices.length > 0 && (
+                <div className="space-y-3">
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                    Ready to import {parsedDevices.length} model{parsedDevices.length === 1 ? "" : "s"}.
+                  </div>
+                  <div className="overflow-x-auto rounded-md border">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-muted/60 text-left">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">Brand</th>
+                          <th className="px-3 py-2 font-semibold">Device</th>
+                          <th className="px-3 py-2 font-semibold">Slug</th>
+                          <th className="px-3 py-2 font-semibold">Storages</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedDevices.map((device) => (
+                          <tr key={`${device.brand}-${device.device}-${device.slug}`} className="border-t">
+                            <td className="px-3 py-2">{device.brand}</td>
+                            <td className="px-3 py-2 font-medium uppercase">{device.device}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{device.slug || "—"}</td>
+                            <td className="px-3 py-2">{device.storages.join(", ") || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-end gap-3">
+                    <Button variant="outline" onClick={() => setParsedDevices([])}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleImportDevices} disabled={isImporting || !isAdmin}>
+                      {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirm and import
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="rules">
+          <Card>
+            <CardHeader>
+              <CardTitle>Operational guardrails</CardTitle>
+              <CardDescription>Make sure only clean data ships to buyers</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>• All new items require brand, model, and grade before publishing.</p>
+              <p>• Pricing must be updated weekly; alerts trigger after 7 days of inactivity.</p>
+              <p>• Anonymous users can preview catalog but cannot publish changes.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add catalog item</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Field label="Model" value={newItem.model} onChange={(value) => setNewItem({ ...newItem, model: value })} />
+            <Field label="Brand" value={newItem.brand} onChange={(value) => setNewItem({ ...newItem, brand: value })} />
+            <Field label="Storage" value={newItem.storage} onChange={(value) => setNewItem({ ...newItem, storage: value })} />
+            <Field label="Condition" value={newItem.condition} onChange={(value) => setNewItem({ ...newItem, condition: value })} />
+            <Field label="Price" type="number" value={newItem.price} onChange={(value) => setNewItem({ ...newItem, price: value })} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={isSaving || !isAdmin}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Publish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PageShell>
+  );
+}
+
+function StatCard({ title, value, hint }: { title: string; value: string; hint: string }) {
+  return (
+    <Card className="hover-elevate">
+      <CardHeader className="pb-2">
+        <CardDescription>{title}</CardDescription>
+        <CardTitle className="text-3xl">{value}</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0 text-sm text-muted-foreground">{hint}</CardContent>
+    </Card>
+  );
+}
+
+type ParsedDevice = {
+  brand: string;
+  device: string;
+  slug?: string;
+  storages: string[];
+};
+
+function parseDevicePayload(raw: string): ParsedDevice[] {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error: any) {
+    throw new Error("JSON could not be parsed. Double-check the payload.");
+  }
+
+  const entries = Array.isArray(parsed)
+    ? parsed
+    : parsed?.devices || parsed?.models || parsed?.data || parsed?.items || [];
+
+  if (!Array.isArray(entries)) {
+    throw new Error("Expected an array of devices or a { devices: [] } object.");
+  }
+
+  return entries.map((entry, index) => {
+    const brand = entry.brand || entry.make || "";
+    const device = entry.device || entry.model || entry.name || "";
+    const slug = entry.slug || entry.handle || "";
+    const storagesRaw = entry.storages ?? entry.storageOptions ?? entry.storage ?? [];
+    const storages = Array.isArray(storagesRaw)
+      ? storagesRaw
+      : typeof storagesRaw === "string"
+        ? storagesRaw.split(",").map((value: string) => value.trim()).filter(Boolean)
+        : [];
+
+    if (!brand || !device) {
+      throw new Error(`Row ${index + 1} is missing required brand or device fields.`);
+    }
+
+    return {
+      brand,
+      device,
+      slug,
+      storages,
+    } as ParsedDevice;
+  });
+}
+
+function EmptyState() {
+  return (
+    <div className="flex items-center justify-center rounded-lg border border-dashed p-6 text-muted-foreground">
+      No catalog data yet. Add your first item to get started.
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+  return (
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      <Input value={value} type={type} onChange={(e) => onChange(e.target.value)} />
+    </div>
   );
 }
