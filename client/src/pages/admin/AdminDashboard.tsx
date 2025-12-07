@@ -1,202 +1,168 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useCatalog } from "@/hooks/useCatalog";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { AuthOverlay } from "@/components/AuthOverlay";
+import { useCatalog } from "@/hooks/useCatalog";
 import { useFirebaseUser } from "@/hooks/useFirebaseUser";
-import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { Loader2, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Activity, Clock, PackageSearch, TrendingUp } from "lucide-react";
+
+interface KpiCardProps {
+  title: string;
+  value: string;
+  hint: string;
+}
+
+interface TimelineItem {
+  title: string;
+  meta: string;
+  badge?: string;
+}
 
 export default function AdminDashboard() {
-  const { items, summary, loading } = useCatalog();
-  const { isAdmin, profile } = useFirebaseUser();
-  const { toast } = useToast();
-  const [isDialogOpen, setDialogOpen] = useState(false);
-  const [newItem, setNewItem] = useState({ model: "", brand: "", storage: "", condition: "", price: "" });
-  const [isSaving, setSaving] = useState(false);
+  const { summary, loading } = useCatalog();
+  const { isAdmin } = useFirebaseUser();
 
-  const latestItems = useMemo(() => items.slice(0, 5), [items]);
+  const kpis: KpiCardProps[] = useMemo(
+    () => [
+      { title: "Orders today", value: "24", hint: "+12% vs yesterday" },
+      { title: "Quotes in review", value: "7", hint: "2 awaiting approval" },
+      { title: "Active companies", value: "32", hint: "New this week: 4" },
+      {
+        title: "Live listings",
+        value: loading ? "–" : summary.total.toString(),
+        hint: loading ? "Syncing catalog" : `${summary.brands} brands live`,
+      },
+    ],
+    [loading, summary.brands, summary.total],
+  );
 
-  const handleCreate = async () => {
-    setSaving(true);
-    const ref = doc(collection(db, "catalog"));
-    await setDoc(ref, {
-      ...newItem,
-      price: Number(newItem.price) || 0,
-      status: "live",
-      updatedAt: serverTimestamp(),
-      createdBy: profile?.email ?? "",
-    });
-    setSaving(false);
-    setDialogOpen(false);
-    setNewItem({ model: "", brand: "", storage: "", condition: "", price: "" });
-  };
+  const pipeline: TimelineItem[] = [
+    { title: "Orders", meta: "18 open • 3 expedited", badge: "Priority" },
+    { title: "Quotes", meta: "7 pending • 2 approvals", badge: "Review" },
+    { title: "Shipments", meta: "6 in motion • 2 arriving today", badge: "Logistics" },
+  ];
+
+  const activity: TimelineItem[] = [
+    { title: "Dallas Warehouse", meta: "PO-2310 preparing pick" },
+    { title: "UPS Freight", meta: "PO-2298 arriving today" },
+    { title: "FedEx", meta: "PO-2284 in transit" },
+    { title: "Account approvals", meta: "3 buyers verified" },
+  ];
+
+  const supplyHealth = useMemo(
+    () => ({
+      live: loading ? "–" : summary.total.toString(),
+      avgPrice: loading ? "–" : `$${summary.avgPrice.toFixed(2)}`,
+      brands: loading ? "–" : summary.brands.toString(),
+    }),
+    [loading, summary.avgPrice, summary.brands, summary.total],
+  );
 
   return (
     <PageShell
-      title="Catalog workspace"
-      description="Track live catalog activity and publish updates from one view."
+      title="Admin dashboard"
+      description="Track orders, customer health, and supply performance."
       badge="Admin"
       actions={
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Add catalog item
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <a href="/admin/orders">View orders</a>
+          </Button>
+          <Button asChild>
+            <a href="/admin/reports">Export reports</a>
+          </Button>
+        </div>
       }
     >
-      {!isAdmin && <AuthOverlay title="Admin access required" description="Sign in to manage the catalog." />}
+      {!isAdmin && <AuthOverlay title="Admin access required" description="Sign in to manage the workspace." />}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <StatCard title="Live items" value={loading ? "–" : summary.total.toString()} hint="Active listings" />
-        <StatCard title="Brands" value={loading ? "–" : summary.brands.toString()} hint="Unique brands" />
-        <StatCard title="Avg. price" value={loading ? "–" : `$${summary.avgPrice.toFixed(2)}`} hint="Per item" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((kpi) => (
+          <KpiCard key={kpi.title} {...kpi} />
+        ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex items-center justify-between">
             <div>
-              <CardTitle>Latest updates</CardTitle>
-              <CardDescription>Recent catalog changes pushed to buyers</CardDescription>
+              <CardTitle>Operations pulse</CardTitle>
+              <CardDescription>Stay ahead of procurement and logistics</CardDescription>
             </div>
-            <Badge variant="outline">Realtime</Badge>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <TrendingUp className="h-4 w-4" /> Live
+            </Badge>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? (
-              <div className="flex h-40 items-center justify-center text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading catalog
-              </div>
-            ) : latestItems.length === 0 ? (
-              <EmptyState />
-            ) : (
-              latestItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="font-semibold">{item.model}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {[item.brand, item.storage, item.condition].filter(Boolean).join(" • ") || "Unspecified"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{item.price ? `$${item.price.toFixed(2)}` : "Price TBC"}</p>
-                    <Badge variant={item.status === "live" ? "secondary" : "outline"}>{item.status || "draft"}</Badge>
-                  </div>
+          <CardContent className="space-y-4">
+            {pipeline.map((item) => (
+              <div key={item.title} className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <p className="font-semibold">{item.title}</p>
+                  <p className="text-sm text-muted-foreground">{item.meta}</p>
                 </div>
-              ))
-            )}
+                {item.badge && <Badge variant="secondary">{item.badge}</Badge>}
+              </div>
+            ))}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Activity</CardTitle>
-            <CardDescription>Who last touched the catalog</CardDescription>
+            <CardTitle>Supply health</CardTitle>
+            <CardDescription>Snapshot of live catalog performance</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? (
-              <div className="flex items-center text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing activity
-              </div>
-            ) : latestItems.length === 0 ? (
-              <EmptyState />
-            ) : (
-              latestItems.map((item) => (
-                <div key={item.id} className="rounded-lg bg-muted/60 p-3">
-                  <p className="text-sm font-semibold">{item.model}</p>
-                  <p className="text-xs text-muted-foreground">Updated {item.updatedAt ? new Date(item.updatedAt as any).toLocaleString() : "just now"}</p>
-                </div>
-              ))
-            )}
+          <CardContent className="space-y-4">
+            <HealthRow icon={<PackageSearch className="h-4 w-4" />} label="Live listings" value={supplyHealth.live} />
+            <HealthRow icon={<Activity className="h-4 w-4" />} label="Average price" value={supplyHealth.avgPrice} />
+            <HealthRow icon={<Clock className="h-4 w-4" />} label="Brands" value={supplyHealth.brands} />
+            <Separator />
+            <p className="text-sm text-muted-foreground">
+              Data refreshes automatically from the catalog feed. Publish updates in Inventory when you are ready.
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="catalog" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="catalog">Catalog</TabsTrigger>
-          <TabsTrigger value="rules">Quality rules</TabsTrigger>
-        </TabsList>
-        <TabsContent value="catalog">
-          <Card>
-            <CardHeader>
-              <CardTitle>All catalog items</CardTitle>
-              <CardDescription>Live view of what buyers can see</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {loading ? (
-                <div className="col-span-full flex items-center justify-center py-8 text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading catalog
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent activity</CardTitle>
+            <CardDescription>Live updates from warehouses and approvals</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {activity.map((item) => (
+              <div key={item.title} className="flex items-center justify-between rounded-lg bg-muted/60 p-3">
+                <div>
+                  <p className="font-semibold">{item.title}</p>
+                  <p className="text-sm text-muted-foreground">{item.meta}</p>
                 </div>
-              ) : items.length === 0 ? (
-                <EmptyState />
-              ) : (
-                items.map((item) => (
-                  <Card key={item.id} className="border-dashed">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">{item.model}</CardTitle>
-                      <CardDescription>
-                        {[item.brand, item.storage, item.condition].filter(Boolean).join(" • ") || "Unspecified"}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between text-sm">
-                      <Badge variant="secondary">{item.status || "draft"}</Badge>
-                      <span className="font-semibold">{item.price ? `$${item.price.toFixed(2)}` : "TBD"}</span>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="rules">
-          <Card>
-            <CardHeader>
-              <CardTitle>Operational guardrails</CardTitle>
-              <CardDescription>Make sure only clean data ships to buyers</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>• All new items require brand, model, and grade before publishing.</p>
-              <p>• Pricing must be updated weekly; alerts trigger after 7 days of inactivity.</p>
-              <p>• Anonymous users can preview catalog but cannot publish changes.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                <Badge variant="outline">Live</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add catalog item</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <Field label="Model" value={newItem.model} onChange={(value) => setNewItem({ ...newItem, model: value })} />
-            <Field label="Brand" value={newItem.brand} onChange={(value) => setNewItem({ ...newItem, brand: value })} />
-            <Field label="Storage" value={newItem.storage} onChange={(value) => setNewItem({ ...newItem, storage: value })} />
-            <Field label="Condition" value={newItem.condition} onChange={(value) => setNewItem({ ...newItem, condition: value })} />
-            <Field label="Price" type="number" value={newItem.price} onChange={(value) => setNewItem({ ...newItem, price: value })} />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate} disabled={isSaving || !isAdmin}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Publish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick admin actions</CardTitle>
+            <CardDescription>Stay a step ahead of procurement</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 md:grid-cols-2">
+            <ActionLink href="/admin/quotes" label="Create quote" />
+            <ActionLink href="/admin/inventory" label="View catalog" />
+            <ActionLink href="/admin/orders" label="Reorder favorites" />
+            <ActionLink href="/admin/reports" label="Book freight pickup" />
+          </CardContent>
+        </Card>
+      </div>
     </PageShell>
   );
 }
 
-function StatCard({ title, value, hint }: { title: string; value: string; hint: string }) {
+function KpiCard({ title, value, hint }: KpiCardProps) {
   return (
     <Card className="hover-elevate">
       <CardHeader className="pb-2">
@@ -208,19 +174,25 @@ function StatCard({ title, value, hint }: { title: string; value: string; hint: 
   );
 }
 
-function EmptyState() {
+function HealthRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-center rounded-lg border border-dashed p-6 text-muted-foreground">
-      No catalog data yet. Add your first item to get started.
+    <div className="flex items-center justify-between rounded-lg border p-3">
+      <div className="flex items-center gap-3 text-sm">
+        <div className="rounded-full bg-muted p-2 text-muted-foreground">{icon}</div>
+        <div>
+          <p className="font-medium text-foreground">{label}</p>
+          <p className="text-muted-foreground">Updated just now</p>
+        </div>
+      </div>
+      <p className="text-lg font-semibold">{value}</p>
     </div>
   );
 }
 
-function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function ActionLink({ href, label }: { href: string; label: string }) {
   return (
-    <div className="space-y-1">
-      <Label>{label}</Label>
-      <Input value={value} type={type} onChange={(e) => onChange(e.target.value)} />
-    </div>
+    <Button asChild variant="outline" className="justify-start">
+      <a href={href}>{label}</a>
+    </Button>
   );
 }

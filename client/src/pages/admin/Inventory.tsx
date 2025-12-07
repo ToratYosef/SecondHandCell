@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useFirebaseUser } from "@/hooks/useFirebaseUser";
+import { useCatalog } from "@/hooks/useCatalog";
+import type { CatalogItem } from "@shared/schema";
 
 type VariantPayload = {
   storage?: string;
@@ -111,6 +113,26 @@ function parseDeviceJson(raw: string): ImportPreview[] {
   return previews;
 }
 
+function mapCatalogItemsToDevices(items: CatalogItem[]): any[] {
+  return items.map((item) => ({
+    id: item.id,
+    brand: item.brand || "",
+    name: item.model || item.slug || "",
+    imageUrl: item.imageUrl,
+    variants: [
+      {
+        id: item.id,
+        storage: item.storage || "N/A",
+        conditionGrade: item.condition || item.status || "Unspecified",
+        networkLockStatus: item.networkLockStatus || "Unlocked",
+        inventory: { quantityAvailable: item.quantity ?? 0 },
+        priceTiers: [{ unitPrice: item.price ?? 0 }],
+        status: item.status ?? "draft",
+      },
+    ],
+  }));
+}
+
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -160,9 +182,16 @@ export default function Inventory() {
 
   const { toast } = useToast();
 
-  const { data: devices, isLoading } = useQuery<any[]>({
+  const { data: devicesFromApi, isLoading: isLoadingApi } = useQuery<any[]>({
     queryKey: ["/api/catalog"],
   });
+
+  const { items: liveCatalog, loading: isLoadingLiveCatalog } = useCatalog();
+
+  const devices = devicesFromApi && devicesFromApi.length > 0
+    ? devicesFromApi
+    : mapCatalogItemsToDevices(liveCatalog || []);
+  const isLoading = isLoadingApi || isLoadingLiveCatalog;
 
   const { data: categories } = useQuery<any[]>({
     queryKey: ["/api/categories"],
