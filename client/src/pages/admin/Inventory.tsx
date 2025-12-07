@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useFirebaseUser } from "@/hooks/useFirebaseUser";
+import { useCatalog } from "@/hooks/useCatalog";
+import type { CatalogItem } from "@shared/schema";
 
 type VariantPayload = {
   storage?: string;
@@ -49,6 +51,8 @@ type ImportPreview = {
   slug?: string;
 };
 
+const importPlaceholder = `[{ "brand": "Iphone", "name": "IPHONE 12 PRO", "imageUrl": "https://raw.githubusercontent.com/ToratYosef/BuyBacking/main/iphone/assets/i12p", "variants": [{ "storage": "128GB", "networkLockStatus": "Unlocked", "conditionGrade": "A", "unitPrice": 1000, "quantity": 100 }] }]`;
+
 function slugify(text: string) {
   return text
     .toLowerCase()
@@ -78,10 +82,13 @@ function parseDeviceJson(raw: string): ImportPreview[] {
     const baseBrand = device.brand || device.deviceBrand || device.make || "";
     const baseModel = device.name || device.model || device.device || "";
     const slug = device.slug || (baseModel ? slugify(baseModel) : undefined);
-    const baseImage = device.imageUrl || (device as any).image || undefined;
+    const baseImage = (device.imageUrl || (device as any).image || "").toString().trim();
     const variants = device.variants && Array.isArray(device.variants) ? device.variants : [];
 
     if (!baseBrand || !baseModel || variants.length === 0) return;
+    if (!baseImage) {
+      throw new Error("Each device needs an imageUrl. Follow the provided JSON format.");
+    }
 
     variants.forEach((variant) => {
       previews.push({
@@ -104,6 +111,26 @@ function parseDeviceJson(raw: string): ImportPreview[] {
   }
 
   return previews;
+}
+
+function mapCatalogItemsToDevices(items: CatalogItem[]): any[] {
+  return items.map((item) => ({
+    id: item.id,
+    brand: item.brand || "",
+    name: item.model || item.slug || "",
+    imageUrl: item.imageUrl,
+    variants: [
+      {
+        id: item.id,
+        storage: item.storage || "N/A",
+        conditionGrade: item.condition || item.status || "Unspecified",
+        networkLockStatus: item.networkLockStatus || "Unlocked",
+        inventory: { quantityAvailable: item.quantity ?? 0 },
+        priceTiers: [{ unitPrice: item.price ?? 0 }],
+        status: item.status ?? "draft",
+      },
+    ],
+  }));
 }
 
 export default function Inventory() {
@@ -155,9 +182,16 @@ export default function Inventory() {
 
   const { toast } = useToast();
 
-  const { data: devices, isLoading } = useQuery<any[]>({
+  const { data: devicesFromApi, isLoading: isLoadingApi } = useQuery<any[]>({
     queryKey: ["/api/catalog"],
   });
+
+  const { items: liveCatalog, loading: isLoadingLiveCatalog } = useCatalog();
+
+  const devices = devicesFromApi && devicesFromApi.length > 0
+    ? devicesFromApi
+    : mapCatalogItemsToDevices(liveCatalog || []);
+  const isLoading = isLoadingApi || isLoadingLiveCatalog;
 
   const { data: categories } = useQuery<any[]>({
     queryKey: ["/api/categories"],
@@ -910,12 +944,12 @@ export default function Inventory() {
           <div className="flex flex-col gap-4 max-h-[70vh]">
             <div className="space-y-2">
               <Label>Paste JSON payload</Label>
-              <Textarea
-                value={importJson}
-                onChange={(e) => setImportJson(e.target.value)}
-                className="min-h-[240px] font-mono"
-                placeholder="[{ \"brand\": \"Iphone\", \"name\": \"IPHONE 12 PRO\", \"variants\": [...] }]"
-              />
+                <Textarea
+                  value={importJson}
+                  onChange={(e) => setImportJson(e.target.value)}
+                  className="min-h-[240px] font-mono"
+                  placeholder={importPlaceholder}
+                />
               <p className="text-xs text-muted-foreground">
                 Format matches <code>devices.json</code>: brand, name, imageUrl, category, and a <code>variants</code> array with storage, networkLockStatus, conditionGrade, unitPrice, and quantity.
               </p>
