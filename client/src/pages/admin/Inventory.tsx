@@ -33,20 +33,16 @@ export default function Inventory() {
   {
     "brand": "Apple",
     "name": "iPhone 13",
-    "marketingName": "iPhone 13",
-    "sku": "IPH13-BASE",
-    "variants": [{ "storage": "128GB", "color": "Black", "conditionGrade": "A", "networkLockStatus": "unlocked", "unitPrice": 499.99, "quantity": 10 }]
+    "imageUrl": "https://example.com/iphone13.jpg",
+    "variants": [{ "storage": "128GB", "conditionGrade": "A", "networkLockStatus": "unlocked", "unitPrice": 499.99, "quantity": 10 }]
   }
 ]`);
   const [form, setForm] = useState({
     brand: "",
     name: "",
-    marketingName: "",
     imageUrl: "",
-    sku: "",
     categorySlug: "",
     storage: "64GB",
-    color: "Black",
     conditionGrade: "A",
     networkLockStatus: "unlocked",
     unitPrice: "0",
@@ -75,13 +71,10 @@ export default function Inventory() {
       return await apiRequest("POST", "/api/admin/device-models", {
         brand: form.brand,
         name: form.name,
-        marketingName: form.marketingName || form.name,
         imageUrl: form.imageUrl || undefined,
-        sku: form.sku,
         categorySlug: form.categorySlug || undefined,
         variant: {
           storage: form.storage,
-          color: form.color,
           conditionGrade: form.conditionGrade,
           networkLockStatus: form.networkLockStatus,
           unitPrice: parseFloat(form.unitPrice || "0"),
@@ -226,6 +219,7 @@ export default function Inventory() {
       ...variant,
       device: {
         brand: device.brand,
+        name: device.name,
         marketingName: device.marketingName,
         sku: device.sku,
       },
@@ -239,12 +233,13 @@ export default function Inventory() {
 
   const filteredVariants = allVariants.filter((variant: any) => {
     const searchLower = searchTerm.toLowerCase();
+    const marketingNameLower = (variant.device.marketingName || variant.device.name || "").toLowerCase();
     const matchesSearch =
-      variant.device.marketingName.toLowerCase().includes(searchLower) ||
-      variant.device.brand.toLowerCase().includes(searchLower) ||
-      variant.device.sku.toLowerCase().includes(searchLower) ||
-      variant.storage.toLowerCase().includes(searchLower) ||
-      variant.color.toLowerCase().includes(searchLower);
+      marketingNameLower.includes(searchLower) ||
+      (variant.device.brand || "").toLowerCase().includes(searchLower) ||
+      (variant.device.sku || "").toLowerCase().includes(searchLower) ||
+      (variant.storage || "").toLowerCase().includes(searchLower) ||
+      (variant.color || "").toLowerCase().includes(searchLower);
 
       const matchesBrand = filters.brand === "all" || !filters.brand || variant.device.brand === filters.brand;
       const matchesColor = filters.color === "all" || !filters.color || variant.color === filters.color;
@@ -283,9 +278,10 @@ export default function Inventory() {
 
   const toggleGroup = (key: string) => setExpandedGroups((s) => ({ ...s, [key]: !s[key] }));
 
-  // Group variants by device title (brand + marketingName + storage)
+  // Group variants by device title (brand + name + storage)
   const groups = allVariants.reduce((acc: any, v: any) => {
-    const title = `${v.device.brand} ${v.device.marketingName} ${v.storage}`;
+    const displayName = v.device.marketingName || v.device.name || v.device.modelName || "";
+    const title = `${v.device.brand} ${displayName} ${v.storage}`.trim();
     if (!acc[title]) acc[title] = [];
     acc[title].push(v);
     return acc;
@@ -493,15 +489,20 @@ export default function Inventory() {
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <Badge variant="outline">{variant.device.brand}</Badge>
-                      <h3 className="font-semibold">{variant.device.marketingName}</h3>
-                      <Badge variant="secondary">{variant.storage}</Badge>
-                      <Badge variant="secondary">{variant.color}</Badge>
-                      <ConditionBadge grade={variant.conditionGrade} />
-                    </div>
+                    {(() => {
+                      const displayName = variant.device?.marketingName || variant.device?.name || variant.device?.modelName;
+                      return (
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <Badge variant="outline">{variant.device.brand}</Badge>
+                          <h3 className="font-semibold">{displayName}</h3>
+                          <Badge variant="secondary">{variant.storage}</Badge>
+                          <Badge variant="secondary">{variant.color}</Badge>
+                          <ConditionBadge grade={variant.conditionGrade} />
+                        </div>
+                      );
+                    })()}
                     <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                      <span>SKU: {variant.device.sku}</span>
+                      {variant.device?.sku && <span>SKU: {variant.device.sku}</span>}
                       <span>Network: {variant.networkLockStatus}</span>
                       <span>Min order: {variant.inventory?.minOrderQuantity ?? 1}</span>
                       {typeof variant.unitPrice === "number" && (
@@ -674,10 +675,6 @@ export default function Inventory() {
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <Label>Marketing Name</Label>
-                <Input value={form.marketingName} onChange={(e) => setForm({ ...form, marketingName: e.target.value })} />
-              </div>
-              <div className="space-y-2">
                 <Label>Image URL</Label>
                 <Input
                   type="url"
@@ -685,10 +682,6 @@ export default function Inventory() {
                   value={form.imageUrl}
                   onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>SKU</Label>
-                <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Category</Label>
@@ -744,10 +737,6 @@ export default function Inventory() {
               <div className="space-y-2">
                 <Label>Storage</Label>
                 <Input value={form.storage} onChange={(e) => setForm({ ...form, storage: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <Input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Unit Price (USD)</Label>
@@ -822,7 +811,14 @@ export default function Inventory() {
             </DialogDescription>
           </DialogHeader>
           <div>
-            <p>Are you sure you want to delete {deletingVariant ? `${deletingVariant.device.marketingName} (${deletingVariant.storage} ${deletingVariant.color})` : "this variant"}?</p>
+            <p>
+              Are you sure you want to delete
+              {" "}
+              {deletingVariant
+                ? `${deletingVariant.device.marketingName || deletingVariant.device.name || "this device"} (${deletingVariant.storage} ${deletingVariant.color})`
+                : "this variant"}
+              ?
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteVariantDialogOpen(false)}>Cancel</Button>
