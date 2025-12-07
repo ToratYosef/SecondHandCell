@@ -13,6 +13,98 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useFirebaseUser } from "@/hooks/useFirebaseUser";
+
+type VariantPayload = {
+  storage?: string;
+  networkLockStatus?: string;
+  conditionGrade?: string;
+  unitPrice?: number;
+  quantity?: number;
+};
+
+type DevicePayload = {
+  brand?: string;
+  name?: string;
+  device?: string;
+  model?: string;
+  slug?: string;
+  imageUrl?: string;
+  category?: string;
+  variants?: VariantPayload[];
+};
+
+type ImportPreview = {
+  brand: string;
+  model: string;
+  storage?: string;
+  networkLockStatus?: string;
+  condition?: string;
+  price?: number;
+  quantity?: number;
+  category?: string;
+  imageUrl?: string;
+  slug?: string;
+};
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function parseDeviceJson(raw: string): ImportPreview[] {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error: any) {
+    throw new Error("JSON could not be parsed. Check the payload.");
+  }
+
+  const entries: DevicePayload[] = Array.isArray(parsed)
+    ? parsed
+    : parsed?.devices || parsed?.items || [];
+
+  if (!Array.isArray(entries)) {
+    throw new Error("Expected an array or { devices: [] } payload.");
+  }
+
+  const previews: ImportPreview[] = [];
+
+  entries.forEach((device) => {
+    const baseBrand = device.brand || device.deviceBrand || device.make || "";
+    const baseModel = device.name || device.model || device.device || "";
+    const slug = device.slug || (baseModel ? slugify(baseModel) : undefined);
+    const baseImage = device.imageUrl || (device as any).image || undefined;
+    const variants = device.variants && Array.isArray(device.variants) ? device.variants : [];
+
+    if (!baseBrand || !baseModel || variants.length === 0) return;
+
+    variants.forEach((variant) => {
+      previews.push({
+        brand: baseBrand,
+        model: baseModel,
+        storage: variant.storage,
+        networkLockStatus: variant.networkLockStatus,
+        condition: variant.conditionGrade,
+        price: typeof variant.unitPrice === "number" ? variant.unitPrice : Number(variant.unitPrice ?? 0),
+        quantity: typeof variant.quantity === "number" ? variant.quantity : Number(variant.quantity ?? 0),
+        category: device.category,
+        imageUrl: baseImage,
+        slug,
+      });
+    });
+  });
+
+  if (previews.length === 0) {
+    throw new Error("No devices found. Include brand, name, and variants for each device.");
+  }
+
+  return previews;
+}
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,6 +112,7 @@ export default function Inventory() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingVariant, setEditingVariant] = useState<any>(null);
+  const { isAdmin, profile } = useFirebaseUser();
   const [editForm, setEditForm] = useState({
     storage: "",
     conditionGrade: "",
@@ -28,14 +121,20 @@ export default function Inventory() {
     quantity: "0",
     minOrderQuantity: "1",
   });
-  const [importPayload, setImportPayload] = useState(`[
+  const [importJson, setImportJson] = useState(`[
   {
-    "brand": "Apple",
-    "name": "iPhone 13",
-    "imageUrl": "https://example.com/iphone13.jpg",
-    "variants": [{ "storage": "128GB", "conditionGrade": "A", "networkLockStatus": "unlocked", "unitPrice": 499.99, "quantity": 10 }]
+    "brand": "Iphone",
+    "name": "IPHONE 12 PRO",
+    "imageUrl": "https://raw.githubusercontent.com/ToratYosef/BuyBacking/main/iphone/assets/i12p",
+    "category": "Smartphones",
+    "variants": [
+      { "storage": "128GB", "networkLockStatus": "Unlocked", "conditionGrade": "A", "unitPrice": 1000, "quantity": 100 }
+    ]
   }
 ]`);
+  const [parsedImports, setParsedImports] = useState<ImportPreview[]>([]);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [form, setForm] = useState({
     brand: "",
     name: "",
@@ -95,24 +194,6 @@ export default function Inventory() {
     },
   });
 
-  const importDevicesMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      return await apiRequest("POST", "/api/admin/device-import", payload);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
-      toast({ title: "Import completed", description: "Devices were imported successfully" });
-      setImportDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Import failed",
-        description: error.message || "Unable to import devices",
-        variant: "destructive",
-      });
-    },
-  });
-
   const updateVariantMutation = useMutation({
     mutationFn: async ({ id, payload }: { id: string; payload: any }) => {
       return await apiRequest("PATCH", `/api/admin/device-variants/${id}`, payload);
@@ -153,17 +234,73 @@ export default function Inventory() {
     addDeviceMutation.mutate();
   };
 
-  const handleImportSubmit = () => {
+  const handleConvertImport = () => {
     try {
-      const parsed = JSON.parse(importPayload);
-      const payload = Array.isArray(parsed) ? { devices: parsed } : parsed;
-      importDevicesMutation.mutate(payload);
-    } catch (error: any) {
+      const parsed = parseDeviceJson(importJson);
+      setParsedImports(parsed);
+      setImportError(null);
       toast({
-        title: "Invalid import payload",
-        description: "Please provide valid JSON for devices",
+        title: "Payload converted",
+        description: `Ready to import ${parsed.length} variant${parsed.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error: any) {
+      setParsedImports([]);
+      setImportError(error.message || "Unable to parse JSON");
+      toast({
+        title: "Invalid JSON",
+        description: error.message || "Follow the devices.json format and try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!isAdmin) {
+      toast({ title: "Admin required", description: "Sign in as an admin to import devices." });
+      return;
+    }
+
+    if (parsedImports.length === 0) {
+      toast({ title: "Nothing to import", description: "Convert JSON to preview devices first." });
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const batch = writeBatch(db);
+
+      parsedImports.forEach((item) => {
+        const ref = doc(collection(db, "catalog"));
+        batch.set(ref, {
+          brand: item.brand,
+          model: item.model,
+          slug: item.slug,
+          storage: item.storage,
+          condition: item.condition,
+          networkLockStatus: item.networkLockStatus,
+          price: item.price ?? 0,
+          quantity: item.quantity ?? 0,
+          category: item.category,
+          imageUrl: item.imageUrl,
+          status: "live",
+          updatedAt: serverTimestamp(),
+          createdBy: profile?.email ?? "",
+        });
+      });
+
+      await batch.commit();
+      toast({ title: "Import complete", description: `${parsedImports.length} variant(s) saved to Firestore.` });
+      setParsedImports([]);
+      setImportJson("");
+      setImportDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Import failed",
+        description: error.message || "Could not save devices to Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -749,27 +886,79 @@ export default function Inventory() {
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Import Devices</DialogTitle>
+            <DialogTitle>Import devices from JSON</DialogTitle>
             <DialogDescription>
-              Upload multiple devices at once using JSON format.
+              Paste the <code>devices.json</code> payload, preview the variants, then publish to Firestore.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>Paste JSON payload</Label>
-            <Textarea
-              value={importPayload}
-              onChange={(e) => setImportPayload(e.target.value)}
-              className="min-h-[180px]"
-            />
-            <p className="text-xs text-muted-foreground">
-              Provide an array of devices or an object with a <code>devices</code> array.
-            </p>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Paste JSON payload</Label>
+              <Textarea
+                value={importJson}
+                onChange={(e) => setImportJson(e.target.value)}
+                className="min-h-[200px] font-mono"
+                placeholder="[{ \"brand\": \"Iphone\", \"name\": \"IPHONE 12 PRO\", \"variants\": [...] }]"
+              />
+              <p className="text-xs text-muted-foreground">
+                Format matches <code>devices.json</code>: brand, name, imageUrl, category, and a <code>variants</code> array with storage, networkLockStatus, conditionGrade, unitPrice, and quantity.
+              </p>
+              {importError && <p className="text-sm text-destructive">{importError}</p>}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={handleConvertImport}>
+                Convert JSON to devices
+              </Button>
+              <Button variant="outline" onClick={() => setParsedImports([])}>
+                Clear preview
+              </Button>
+            </div>
+
+            {parsedImports.length > 0 && (
+              <div className="space-y-3">
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  Ready to import {parsedImports.length} variant{parsedImports.length === 1 ? "" : "s"}.
+                </div>
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-muted/60 text-left">
+                      <tr>
+                        <th className="px-3 py-2 font-semibold">Brand</th>
+                        <th className="px-3 py-2 font-semibold">Device</th>
+                        <th className="px-3 py-2 font-semibold">Storage</th>
+                        <th className="px-3 py-2 font-semibold">Carrier</th>
+                        <th className="px-3 py-2 font-semibold">Grade</th>
+                        <th className="px-3 py-2 font-semibold">Price</th>
+                        <th className="px-3 py-2 font-semibold">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedImports.map((device, idx) => (
+                        <tr key={`${device.brand}-${device.model}-${idx}`} className="border-t">
+                          <td className="px-3 py-2">{device.brand}</td>
+                          <td className="px-3 py-2 font-medium uppercase">{device.model}</td>
+                          <td className="px-3 py-2">{device.storage || "—"}</td>
+                          <td className="px-3 py-2">{device.networkLockStatus || "—"}</td>
+                          <td className="px-3 py-2">{device.condition || "—"}</td>
+                          <td className="px-3 py-2">{typeof device.price === "number" ? `$${device.price.toFixed(2)}` : "—"}</td>
+                          <td className="px-3 py-2">{device.quantity ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <Button variant="outline" onClick={() => setParsedImports([])}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleConfirmImport} disabled={isImporting || !isAdmin}>
+                    {isImporting && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />} Confirm and import
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
       <Dialog open={deleteVariantDialogOpen} onOpenChange={setDeleteVariantDialogOpen}>

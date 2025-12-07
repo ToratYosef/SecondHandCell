@@ -85,6 +85,9 @@ export type CatalogItem = {
   storage?: string;
   condition?: string;
   price?: number;
+  networkLockStatus?: string;
+  quantity?: number;
+  category?: string;
   status?: string;
   imageUrl?: string | null;
   updatedAt?: string | number | Date;
