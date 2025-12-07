@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck, Smartphone, Zap, ArrowRight } from "lucide-react";
+import warehouseHeroBackground from "@assets/generated_images/Warehouse_hero_background_image_8f8c1570.png";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -31,8 +32,8 @@ export default function LoginNew() {
   } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "buyer@example.com",
-      password: "password123",
+      email: "",
+      password: "",
     },
   });
 
@@ -68,29 +69,43 @@ export default function LoginNew() {
   const featureHighlights = [
     {
       title: "Verified supply",
-      description: "Every lot is test-verified with transparent grading.",
+      description: "Each lot is test-verified with transparent grading.",
       icon: ShieldCheck,
     },
     {
-      title: "Purpose-built for wholesale",
+      title: "Wholesale-first",
       description: "Tiered pricing, saved lists, and quote workflows built-in.",
       icon: Smartphone,
     },
     {
-      title: "Lightning-fast checkout",
-      description: "One-click reorders and saved payment methods keep you moving.",
+      title: "Fast checkout",
+      description: "Save payment methods and reorder in a couple clicks.",
       icon: Zap,
     },
   ];
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <UnifiedHeader />
 
-      <main className="flex flex-1 items-center py-16">
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-          <div className="space-y-6">
-            <p className="inline-flex rounded-full border border-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
+      <main className="relative flex flex-1 items-center py-16">
+        <div className="absolute inset-0 overflow-hidden">
+          <img
+            src={warehouseHeroBackground}
+            alt="Warehouse with organized refurbished devices"
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/85 via-slate-900/85 to-slate-950/90" aria-hidden />
+          <div
+            className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(56,189,248,0.12),transparent_35%),radial-gradient(circle_at_80%_0,rgba(129,140,248,0.14),transparent_30%),radial-gradient(circle_at_50%_80%,rgba(16,185,129,0.12),transparent_35%)]"
+            aria-hidden
+          />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-slate-950 to-transparent" aria-hidden />
+        </div>
+
+        <div className="relative z-10 mx-auto grid max-w-6xl items-start gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+          <div className="space-y-6 text-white">
+            <p className="inline-flex rounded-full border border-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/80">
               Secure wholesale access
             </p>
             <h1 className="text-4xl font-semibold leading-tight tracking-tight lg:text-5xl">
@@ -115,15 +130,11 @@ export default function LoginNew() {
             <div className="flex flex-wrap items-center gap-4 text-sm text-white/80">
               <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                99.9% uptime
+                Private marketplace for verified buyers
               </div>
               <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
                 <span className="h-2 w-2 rounded-full bg-sky-400" />
-                SOC2-ready infrastructure
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
-                <span className="h-2 w-2 rounded-full bg-amber-300" />
-                Trusted by 2,000+ resellers
+                Secure payments & fulfillment
               </div>
             </div>
           </div>
@@ -137,7 +148,12 @@ export default function LoginNew() {
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Work email</Label>
-                  <Input id="email" type="email" placeholder="you@company.com" {...register("email")}
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@company.com"
+                    autoComplete="username"
+                    {...register("email")}
                     className={errors.email ? "border-destructive" : ""}
                   />
                   {errors.email && (
