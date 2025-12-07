@@ -1,375 +1,169 @@
-// @ts-nocheck
-import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BuyerLayout } from "@/components/BuyerLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Package, Minus, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ConditionBadge } from "@/components/ConditionBadge";
-import { SaveToListButton } from "@/components/SaveToListButton";
-import { UnifiedHeader } from "@/components/UnifiedHeader";
-import { PublicFooter } from "@/components/PublicFooter";
-import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Heart, ShieldCheck, Sparkles, Truck } from "lucide-react";
+import { PageShell } from "@/components/PageShell";
+
+const specList = [
+  { label: "Model", value: "iPhone 14 Pro" },
+  { label: "Storage", value: "256GB" },
+  { label: "Color mix", value: "Space Black, Deep Purple" },
+  { label: "Condition", value: "Grade A/B tested" },
+  { label: "Network", value: "Unlocked" },
+];
+
+const pricingTiers = [
+  { range: "10-49 units", price: "$435", savings: "Save $15" },
+  { range: "50-149 units", price: "$420", savings: "Save $30" },
+  { range: "150+ units", price: "$405", savings: "Save $45" },
+];
 
 export default function DeviceDetails() {
-  const [, params] = useRoute("/buyer/devices/:slug");
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
-  const [variantQuantities, setVariantQuantities] = useState<Record<string, number>>({});
-  const { toast } = useToast();
-
-  const { data: devices, isLoading } = useQuery({
-    queryKey: ["/api/catalog"],
-  });
-
-  const device = devices?.find((d: any) => d.slug === params?.slug);
-  const selectedVariant = device?.variants?.find((v: any) => v.id === selectedVariantId) || device?.variants?.[0];
-
-  useEffect(() => {
-    if (selectedVariant) {
-      setVariantQuantities((prev) => {
-        if (prev[selectedVariant.id] !== undefined) return prev;
-        const minOrder = Math.max(1, selectedVariant.inventory?.minOrderQuantity ?? 1);
-        return { ...prev, [selectedVariant.id]: minOrder };
-      });
-    }
-  }, [selectedVariant]);
-
-  const getSelectedQuantity = () => {
-    if (!selectedVariant) return 1;
-    const minOrder = Math.max(1, selectedVariant.inventory?.minOrderQuantity ?? 1);
-    return variantQuantities[selectedVariant.id] ?? minOrder;
-  };
-
-  const updateSelectedQuantity = (change: number) => {
-    if (!selectedVariant) return;
-    const maxAvailable = selectedVariant.inventory?.quantityAvailable ?? Number.MAX_SAFE_INTEGER;
-    const minOrder = Math.max(1, selectedVariant.inventory?.minOrderQuantity ?? 1);
-    const currentQty = getSelectedQuantity();
-    const updatedQty = Math.max(minOrder, Math.min(maxAvailable, currentQty + change));
-    setVariantQuantities((prev) => ({ ...prev, [selectedVariant.id]: updatedQty }));
-  };
-
-  const handleQuantityInput = (value: string) => {
-    if (!selectedVariant) return;
-    const maxAvailable = selectedVariant.inventory?.quantityAvailable ?? Number.MAX_SAFE_INTEGER;
-    const minOrder = Math.max(1, selectedVariant.inventory?.minOrderQuantity ?? 1);
-    const parsed = parseInt(value, 10);
-    const safeValue = Number.isNaN(parsed) ? minOrder : parsed;
-    const clamped = Math.max(minOrder, Math.min(maxAvailable, safeValue));
-    setVariantQuantities((prev) => ({ ...prev, [selectedVariant.id]: clamped }));
-  };
-
-  const addToCartMutation = useMutation({
-    mutationFn: async ({ variantId, quantity }: { variantId: string; quantity: number }) => {
-      return await apiRequest("POST", "/api/cart/items", {
-        deviceVariantId: variantId,
-        quantity,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-      toast({
-        title: "Added to cart",
-        description: "Item successfully added to your cart",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add item to cart",
-        variant: "destructive",
-      });
-    },
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <UnifiedHeader />
-        <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <div className="h-8 w-64 bg-muted rounded-md animate-pulse" />
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="h-96 bg-muted rounded-md animate-pulse" />
-                <div className="h-96 bg-muted rounded-md animate-pulse" />
-              </div>
-            </div>
-          </div>
-        </main>
-        <PublicFooter />
-      </div>
-    );
-  }
-
-  if (!device) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <UnifiedHeader />
-        <main className="flex-1 bg-muted/30">
-          <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <h2 className="text-2xl font-semibold mb-2">Device not found</h2>
-                  <p className="text-muted-foreground">The device you're looking for doesn't exist</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </main>
-        <PublicFooter />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex min-h-screen flex-col">
-      <UnifiedHeader />
-      <main className="flex-1 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 space-y-6 sm:px-6 lg:px-8">
-          <div className="space-y-6">
-            <div>
-              <Badge variant="outline" className="mb-2">{device.brand}</Badge>
-              <h1 className="text-3xl font-semibold tracking-tight">{device.marketingName}</h1>
-              <p className="text-muted-foreground mt-1">SKU: {device.sku}</p>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-        <div>
-          <div className="aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden">
-            {device.imageUrl ? (
-              <img
-                src={device.imageUrl}
-                alt={device.marketingName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <Package className="h-24 w-24 text-muted-foreground" />
-            )}
+    <BuyerLayout>
+      <PageShell
+        title="Device detail"
+        description="All the data you need to commit to a lot with confidence."
+        badge="Lot overview"
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon"><Heart className="h-4 w-4" /></Button>
+            <Button asChild><a href="/buyer/cart">Add to cart</a></Button>
           </div>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
+        }
+      >
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Select Variant</CardTitle>
+              <CardTitle>iPhone 14 Pro Mixed Lot</CardTitle>
+              <CardDescription>Unlocked • Face ID calibrated • Tested on PhoneCheck</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {specList.map((spec) => (
+                  <div key={spec.label} className="rounded-xl border bg-muted/30 p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">{spec.label}</p>
+                    <p className="text-base font-semibold">{spec.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <Tabs defaultValue="pricing" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="pricing">Pricing</TabsTrigger>
+                  <TabsTrigger value="testing">Testing</TabsTrigger>
+                  <TabsTrigger value="grades">Cosmetics</TabsTrigger>
+                </TabsList>
+                <TabsContent value="pricing" className="grid gap-3 sm:grid-cols-3">
+                  {pricingTiers.map((tier) => (
+                    <Card key={tier.range} className="border-primary/20 hover:border-primary">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{tier.range}</CardTitle>
+                        <CardDescription>{tier.savings}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-2xl font-semibold">{tier.price}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </TabsContent>
+                <TabsContent value="testing">
+                  <Card className="border-dashed">
+                    <CardHeader className="space-y-1">
+                      <CardTitle>Certified diagnostics</CardTitle>
+                      <CardDescription>Battery health, OEM parts check, secure data wipe documented.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm text-muted-foreground">
+                      <p>PhoneCheck report available for every IMEI.</p>
+                      <p>30-day RMA on functional defects.</p>
+                      <p>Carrier status validated for every unit.</p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                <TabsContent value="grades">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {["Grade A", "Grade B"].map((grade) => (
+                      <Card key={grade}>
+                        <CardHeader>
+                          <CardTitle>{grade}</CardTitle>
+                          <CardDescription>Detailed cosmetic expectations</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm text-muted-foreground">
+                          <p>Minor surface wear allowed; no cracks.</p>
+                          <p>Fully functional; buttons and biometrics tested.</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          <Card className="space-y-4">
+            <CardHeader>
+              <CardTitle>Order this lot</CardTitle>
+              <CardDescription>Secure inventory for 48 hours while you finalize payment.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Select
-                value={selectedVariantId || device.variants?.[0]?.id || ""}
-                onValueChange={setSelectedVariantId}
-              >
-                <SelectTrigger data-testid="select-variant">
-                  <SelectValue placeholder="Choose a variant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {device.variants?.map((variant: any) => (
-                    <SelectItem key={variant.id} value={variant.id}>
-                      {variant.storage} • {variant.color} • Grade {variant.conditionGrade}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {selectedVariant && (
-                <div className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Storage</p>
-                      <p className="font-medium">{selectedVariant.storage}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Color</p>
-                      <p className="font-medium">{selectedVariant.color}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Condition</p>
-                      <ConditionBadge grade={selectedVariant.conditionGrade} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Network</p>
-                      <Badge variant="outline" className="capitalize">
-                        {selectedVariant.networkLockStatus}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {selectedVariant.inventory && (
-                    <div className="bg-muted p-4 rounded-md">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Stock Available</p>
-                          <p className="text-2xl font-bold">{selectedVariant.inventory.quantityAvailable} units</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-muted-foreground">Min Order</p>
-                          <p className="text-lg font-semibold">{selectedVariant.inventory.minOrderQuantity} units</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedVariant.priceTiers && selectedVariant.priceTiers.length > 0 && (
-                    <div>
-                      <p className="font-medium mb-2">Volume Pricing</p>
-                      <div className="space-y-2">
-                        {selectedVariant.priceTiers.map((tier: any, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between text-sm p-2 bg-muted rounded-md">
-                            <span>
-                              {tier.minQuantity}
-                              {tier.maxQuantity ? `-${tier.maxQuantity}` : '+'} units
-                            </span>
-                            <span className="font-semibold">${tier.unitPrice}/ea</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Quantity</p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-10 w-10"
-                          onClick={() => updateSelectedQuantity(-1)}
-                          disabled={!selectedVariant}
-                          data-testid="button-quantity-decrease"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <Input
-                          type="number"
-                          min={selectedVariant?.inventory?.minOrderQuantity ?? 1}
-                          value={getSelectedQuantity()}
-                          onChange={(event) => handleQuantityInput(event.target.value)}
-                          className="w-24 text-center"
-                          data-testid="input-quantity"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-10 w-10"
-                          onClick={() => updateSelectedQuantity(1)}
-                          disabled={!selectedVariant}
-                          data-testid="button-quantity-increase"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {selectedVariant?.inventory?.quantityAvailable && (
-                        <p className="text-xs text-muted-foreground">
-                          {selectedVariant.inventory.quantityAvailable} units available
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        onClick={() =>
-                          addToCartMutation.mutate({
-                            variantId: selectedVariant.id,
-                            quantity: getSelectedQuantity(),
-                          })
-                        }
-                        disabled={!selectedVariant || addToCartMutation.isPending}
-                        className="flex-1"
-                        data-testid="button-add-to-cart"
-                      >
-                        <ShoppingCart className="mr-2 h-4 w-4" />
-                        Add to Cart
-                      </Button>
-                      <SaveToListButton
-                        deviceVariantId={selectedVariant.id}
-                        deviceName={device.marketingName}
-                        variant="outline"
-                        size="default"
-                      />
-                    </div>
-                  </div>
+              <div className="rounded-xl border bg-muted/40 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Available units</span>
+                  <span className="font-semibold">320</span>
                 </div>
-              )}
+                <Progress value={82} className="mt-3" />
+                <p className="mt-2 text-xs text-muted-foreground">High velocity lot — moving quickly</p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-emerald-600">
+                  <ShieldCheck className="h-4 w-4" />
+                  30-day functional warranty included
+                </div>
+                <div className="flex items-center gap-2 text-primary">
+                  <Truck className="h-4 w-4" />
+                  Ships from Dallas in 24-48 hours
+                </div>
+                <div className="flex items-center gap-2 text-amber-600">
+                  <Sparkles className="h-4 w-4" />
+                  Eligible for grading photos on request
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button className="flex-1" asChild>
+                  <a href="/buyer/checkout">Start checkout</a>
+                </Button>
+                <Button variant="outline" className="flex-1" asChild>
+                  <a href="/buyer/quotes/new">Request quote</a>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </div>
 
-      <Tabs defaultValue="description" className="w-full">
-        <TabsList>
-          <TabsTrigger value="description">Description</TabsTrigger>
-          <TabsTrigger value="specs">Specifications</TabsTrigger>
-          <TabsTrigger value="grading">Grading Info</TabsTrigger>
-        </TabsList>
-        <TabsContent value="description" className="space-y-4">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-muted-foreground">{device.description}</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="specs" className="space-y-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Brand</p>
-                  <p className="font-medium">{device.brand}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Model</p>
-                  <p className="font-medium">{device.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Available Variants</p>
-                  <p className="font-medium">{device.variants?.length || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="grading" className="space-y-4">
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2">Grade A - Excellent</h3>
-                <p className="text-sm text-muted-foreground">
-                  Like new condition with minimal to no signs of wear. May have very minor cosmetic imperfections.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Grade B - Very Good</h3>
-                <p className="text-sm text-muted-foreground">
-                  Light signs of wear including minor scratches or scuffs. Fully functional with no impact on performance.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Grade C - Good</h3>
-                <p className="text-sm text-muted-foreground">
-                  Moderate signs of wear including scratches, scuffs, or minor dents. Fully functional.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Grade D - Fair</h3>
-                <p className="text-sm text-muted-foreground">
-                  Heavy cosmetic wear but fully functional. May have dents, deep scratches, or discoloration.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-            </TabsContent>
-          </Tabs>
-          </div>
-        </div>
-      </main>
-      <PublicFooter />
-    </div>
+        <Accordion type="single" collapsible className="space-y-3">
+          <AccordionItem value="faq-1" className="border rounded-xl px-4">
+            <AccordionTrigger>What does grading include?</AccordionTrigger>
+            <AccordionContent>
+              Grade A includes light wear with no cracks; Grade B allows moderate signs of use with full functionality verified.
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="faq-2" className="border rounded-xl px-4">
+            <AccordionTrigger>Can I split shipments?</AccordionTrigger>
+            <AccordionContent>
+              Yes, select freight preferences at checkout or coordinate with your rep for staggered deliveries.
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="faq-3" className="border rounded-xl px-4">
+            <AccordionTrigger>Do you provide IMEI lists?</AccordionTrigger>
+            <AccordionContent>
+              Secure IMEI lists are provided upon purchase and available via CSV export.
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </PageShell>
+    </BuyerLayout>
   );
 }

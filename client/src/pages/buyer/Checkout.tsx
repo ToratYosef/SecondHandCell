@@ -1,427 +1,126 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { BuyerLayout } from "@/components/BuyerLayout";
+import { PageShell } from "@/components/PageShell";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CreditCard, MapPin, Package, Building2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { UnifiedHeader } from "@/components/UnifiedHeader";
-import { PublicFooter } from "@/components/PublicFooter";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || "");
-
-interface Cart {
-  items: Array<{
-    id: string;
-    quantity: number;
-    unitPriceSnapshot: string;
-    variant?: {
-      deviceModel?: {
-        name: string;
-        marketingName?: string;
-      };
-    };
-  }>;
-}
-
-interface Company {
-  shippingAddresses: Array<{
-    id: string;
-    contactName: string;
-    street1: string;
-    city: string;
-    state: string;
-    postalCode: string;
-  }>;
-  billingAddresses: Array<{
-    id: string;
-    contactName: string;
-    street1: string;
-    city: string;
-    state: string;
-    postalCode: string;
-  }>;
-}
-
-interface User {
-  companyId: string;
-}
-
-function CheckoutForm({ orderId, amount, onSuccess }: { orderId: string; amount: number; onSuccess: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { toast } = useToast();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        redirect: "if_required",
-      });
-
-      if (error) {
-        toast({
-          title: "Payment failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else if (paymentIntent && paymentIntent.status === "succeeded") {
-        // Confirm payment on backend
-        await apiRequest("POST", "/api/confirm-payment", {
-          orderId,
-          paymentIntentId: paymentIntent.id,
-        });
-
-        toast({
-          title: "Payment successful",
-          description: "Your order has been placed successfully",
-        });
-        onSuccess();
-      }
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to process payment",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement />
-      <Button
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full"
-        size="lg"
-        data-testid="button-complete-order"
-      >
-        {isProcessing ? "Processing..." : `Pay $${amount.toFixed(2)}`}
-      </Button>
-    </form>
-  );
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { CreditCard, ShieldCheck, Truck } from "lucide-react";
 
 export default function Checkout() {
-  const [, setLocation] = useLocation();
-  const [selectedShippingId, setSelectedShippingId] = useState<string>("");
-  const [selectedBillingId, setSelectedBillingId] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<string>("card");
-  const [notes, setNotes] = useState("");
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  const { data: cart, isLoading: cartLoading } = useQuery<Cart>({
-    queryKey: ["/api/cart"],
-  });
-
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/me"],
-  });
-
-  const { data: company } = useQuery<Company>({
-    queryKey: ["/api/companies", user?.companyId],
-    enabled: !!user?.companyId,
-  });
-
-  const createOrderMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/orders", {
-        shippingAddressId: selectedShippingId,
-        billingAddressId: selectedBillingId,
-        paymentMethod,
-        notes,
-      });
-      return await res.json();
-    },
-    onSuccess: async (order: any) => {
-      setCurrentOrderId(order.id);
-
-      if (paymentMethod === "card") {
-        // Create payment intent for card payments
-        const res = await apiRequest("POST", "/api/create-payment-intent", {
-          amount: order.total,
-          orderId: order.id,
-        });
-        const paymentIntent = await res.json();
-
-        setClientSecret(paymentIntent.clientSecret);
-      } else {
-        // For other payment methods, just redirect to orders
-        toast({
-          title: "Order created",
-          description: `Order ${order.orderNumber} created. Payment instructions will be sent to your email.`,
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-        setTimeout(() => setLocation("/buyer/orders"), 2000);
-      }
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create order",
-        variant: "destructive",
-      });
-    },
-  });
-
-  if (cartLoading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <UnifiedHeader />
-        <main className="flex-1 bg-muted/30">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="space-y-8">
-              <h1 className="text-3xl font-semibold tracking-tight text-center sm:text-left">Checkout</h1>
-              <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-64 bg-muted rounded-md animate-pulse" />
-                  ))}
-                </div>
-                <div className="h-96 bg-muted rounded-md animate-pulse" />
-              </div>
-            </div>
-          </div>
-        </main>
-        <PublicFooter />
-      </div>
-    );
-  }
-
-  const items = cart?.items || [];
-  if (items.length === 0) {
-    setLocation("/buyer/cart");
-    return null;
-  }
-
-  const subtotal = items.reduce((sum: number, item) => {
-    return sum + parseFloat(item.unitPriceSnapshot) * item.quantity;
-  }, 0);
-  const shipping = 25;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
-
-  const shippingAddresses = company?.shippingAddresses || [];
-  const billingAddresses = company?.billingAddresses || [];
-
   return (
-    <div className="flex min-h-screen flex-col">
-      <UnifiedHeader />
-      <main className="flex-1 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="space-y-8">
-            <div className="text-center sm:text-left">
-              <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
-              <p className="text-muted-foreground mt-1">Review and complete your order</p>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
+    <BuyerLayout>
+      <PageShell
+        title="Checkout"
+        description="Confirm freight, payment, and delivery preferences to finalize your order."
+        badge="Secure"
+      >
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Shipping Address
-              </CardTitle>
+              <CardTitle>Delivery & payment</CardTitle>
+              <CardDescription>We keep your details secure and reusable for reorders.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Select value={selectedShippingId} onValueChange={setSelectedShippingId}>
-                <SelectTrigger data-testid="select-shipping">
-                  <SelectValue placeholder="Select shipping address" />
-                </SelectTrigger>
-                <SelectContent>
-                  {shippingAddresses.map((addr) => (
-                    <SelectItem key={addr.id} value={addr.id}>
-                      {addr.contactName} - {addr.street1}, {addr.city}, {addr.state} {addr.postalCode}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <CardContent className="space-y-8">
+              <div className="space-y-4">
+                <Label className="text-sm font-semibold">Shipping address</Label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input placeholder="Company name" />
+                  <Input placeholder="Contact name" />
+                  <Input placeholder="Street address" className="sm:col-span-2" />
+                  <Input placeholder="City" />
+                  <Input placeholder="State" />
+                  <Input placeholder="Postal code" />
+                  <Input placeholder="Country" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-sm font-semibold">Freight method</Label>
+                <RadioGroup defaultValue="freight" className="space-y-3">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border p-4">
+                    <RadioGroupItem value="freight" />
+                    <div>
+                      <p className="font-semibold">LTL Freight</p>
+                      <p className="text-sm text-muted-foreground">Best for pallets and large mixes. 2-4 day transit.</p>
+                    </div>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border p-4">
+                    <RadioGroupItem value="parcel" />
+                    <div>
+                      <p className="font-semibold">Insured Parcel</p>
+                      <p className="text-sm text-muted-foreground">Fast delivery for smaller lots. Tracking provided.</p>
+                    </div>
+                  </label>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-sm font-semibold">Payment</Label>
+                <Tabs defaultValue="card" className="space-y-4">
+                  <TabsList>
+                    <TabsTrigger value="card">Card</TabsTrigger>
+                    <TabsTrigger value="ach">ACH/Wire</TabsTrigger>
+                    <TabsTrigger value="terms">Net terms</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="card" className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input placeholder="Name on card" />
+                      <Input placeholder="Card number" />
+                      <Input placeholder="Expiry" />
+                      <Input placeholder="CVC" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">We tokenize your payment info for next time.</p>
+                  </TabsContent>
+                  <TabsContent value="ach" className="space-y-3">
+                    <Input placeholder="Routing number" />
+                    <Input placeholder="Account number" />
+                    <p className="text-xs text-muted-foreground">We will hold inventory while ACH clears.</p>
+                  </TabsContent>
+                  <TabsContent value="terms" className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Approved accounts can use net terms for frictionless reorders.</p>
+                    <Button variant="outline">Talk to finance</Button>
+                  </TabsContent>
+                </Tabs>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Billing Address
-              </CardTitle>
+              <CardTitle>Order summary</CardTitle>
+              <CardDescription>Reserved for the next 48 hours</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Select value={selectedBillingId} onValueChange={setSelectedBillingId}>
-                <SelectTrigger data-testid="select-billing">
-                  <SelectValue placeholder="Select billing address" />
-                </SelectTrigger>
-                <SelectContent>
-                  {billingAddresses.map((addr) => (
-                    <SelectItem key={addr.id} value={addr.id}>
-                      {addr.contactName} - {addr.street1}, {addr.city}, {addr.state} {addr.postalCode}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <CardContent className="space-y-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span>Lots</span>
+                <span className="font-semibold">$29,550</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" /> Freight
+                </div>
+                <span className="font-semibold">$620</span>
+              </div>
+              <div className="flex items-center justify-between border-t pt-3 text-base font-semibold">
+                <span>Total due</span>
+                <span>$30,170</span>
+              </div>
+              <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 text-emerald-600">
+                  <ShieldCheck className="h-4 w-4" />
+                  Secure checkout with instant confirmations
+                </div>
+                <p className="mt-2">Need an invoice? We’ll email PDFs instantly after payment.</p>
+              </div>
+              <Button className="w-full">Place order</Button>
+              <Button variant="ghost" className="w-full">Schedule later</Button>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Payment Method
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="card" id="card" data-testid="radio-payment-card" />
-                  <Label htmlFor="card" className="font-normal cursor-pointer">
-                    Credit Card (Pay now via Stripe)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="wire" id="wire" data-testid="radio-payment-wire" />
-                  <Label htmlFor="wire" className="font-normal cursor-pointer">
-                    Wire Transfer (Instructions sent after order)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="ach" id="ach" data-testid="radio-payment-ach" />
-                  <Label htmlFor="ach" className="font-normal cursor-pointer">
-                    ACH Payment (Instructions sent after order)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="terms" id="terms" data-testid="radio-payment-terms" />
-                  <Label htmlFor="terms" className="font-normal cursor-pointer">
-                    Net Terms (For approved accounts)
-                  </Label>
-                </div>
-              </RadioGroup>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Notes (Optional)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Add any special instructions for your order..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={4}
-                data-testid="textarea-notes"
-              />
-            </CardContent>
-          </Card>
-
-          {clientSecret && paymentMethod === "card" && currentOrderId && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <CheckoutForm
-                    orderId={currentOrderId}
-                    amount={total}
-                    onSuccess={() => {
-                      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-                      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-                      setLocation("/buyer/orders");
-                    }}
-                  />
-                </Elements>
-              </CardContent>
-            </Card>
-          )}
         </div>
-
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Order Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                {items.map((item) => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {item.variant?.deviceModel?.marketingName || item.variant?.deviceModel?.name} x{item.quantity}
-                    </span>
-                    <span className="font-medium">
-                      ${(parseFloat(item.unitPriceSnapshot) * item.quantity).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t pt-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipping</span>
-                  <span className="font-medium">${shipping.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax (8%)</span>
-                  <span className="font-medium">${tax.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
-                  <span data-testid="text-total">${total.toFixed(2)}</span>
-                </div>
-              </div>
-
-              {!clientSecret && (
-                <Button
-                  onClick={() => createOrderMutation.mutate()}
-                  disabled={!selectedShippingId || !selectedBillingId || createOrderMutation.isPending}
-                  className="w-full"
-                  size="lg"
-                  data-testid="button-place-order"
-                >
-                  {createOrderMutation.isPending ? "Creating order..." : paymentMethod === "card" ? "Continue to Payment" : "Place Order"}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-            </div>
-          </div>
-            </div>
-          </div>
-        </main>
-        <PublicFooter />
-      </div>
-    );
-  }
+      </PageShell>
+    </BuyerLayout>
+  );
+}

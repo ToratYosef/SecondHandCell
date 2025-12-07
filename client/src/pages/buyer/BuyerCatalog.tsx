@@ -1,480 +1,176 @@
-import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { UnifiedHeader } from "@/components/UnifiedHeader";
-import { PublicFooter } from "@/components/PublicFooter";
-import { Button } from "@/components/ui/button";
+import { BuyerLayout } from "@/components/BuyerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link, useLocation } from "wouter";
-import { Smartphone, Search, Loader2, Plus, Minus, ShoppingCart } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { SaveToListButton } from "@/components/SaveToListButton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import { Heart, Layers, Search, ShoppingCart } from "lucide-react";
+import { PageShell } from "@/components/PageShell";
 
-interface Device {
-  id: string;
-  brand: string;
-  marketingName: string;
-  slug: string;
-  categoryId: string;
-  categoryName: string;
-  imageUrl: string | null;
-  description: string | null;
-  variantCount: number;
-  availableConditions?: string[];
-  availableStorage?: string[];
-  availableColors?: string[];
-  variants?: Array<{
-    id: string;
-    storage: string;
-    color: string;
-    conditionGrade: string;
-    minPrice: string;
-    inventory?: {
-      quantityAvailable?: number;
-    };
-  }>;
-}
+const filters = {
+  conditions: ["A Grade", "B Grade", "C Grade"],
+  carriers: ["Unlocked", "T-Mobile", "Verizon", "AT&T"],
+  storage: ["64GB", "128GB", "256GB", "512GB"],
+};
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-}
+const catalog = [
+  {
+    title: "iPhone 14 Pro Mix",
+    subtitle: "Unlocked • Face ID • Tested",
+    badge: "Tiered pricing",
+    price: "$410",
+    tiers: "100+ units",
+  },
+  {
+    title: "Samsung Galaxy S22 Lot",
+    subtitle: "Carrier unlocked • Grade A/B",
+    badge: "Hot stock",
+    price: "$285",
+    tiers: "50+ units",
+  },
+  {
+    title: "Enterprise Laptop Batch",
+    subtitle: "i7 • 16GB • 512GB SSD",
+    badge: "Refreshed",
+    price: "$520",
+    tiers: "25+ units",
+  },
+  {
+    title: "Wearables Bundle",
+    subtitle: "Apple Watch + Galaxy Watch mix",
+    badge: "Bulk ready",
+    price: "$129",
+    tiers: "200+ units",
+  },
+];
 
 export default function BuyerCatalog() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedBrand, setSelectedBrand] = useState<string>("all");
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
-  const { toast } = useToast();
-  const [, setLocation] = useLocation();
-
-  const { data: devices, isLoading: devicesLoading } = useQuery<Device[]>({
-    queryKey: ["/api/catalog"],
-  });
-
-  const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
-  });
-
-  useEffect(() => {
-    if (!devices) return;
-
-    setSelectedVariants((prev) => {
-      const next = { ...prev };
-      devices.forEach((device) => {
-        if (!next[device.id] && device.variants?.[0]) {
-          next[device.id] = device.variants[0].id;
-        }
-      });
-      return next;
-    });
-
-    setQuantities((prev) => {
-      const next = { ...prev };
-      devices.forEach((device) => {
-        const firstVariantId = device.variants?.[0]?.id;
-        if (firstVariantId && next[firstVariantId] === undefined) {
-          next[firstVariantId] = 1;
-        }
-      });
-      return next;
-    });
-  }, [devices]);
-
-  const addToCartMutation = useMutation({
-    mutationFn: async ({ variantId, quantity }: { variantId: string; quantity: number }) => {
-      return await apiRequest("POST", "/api/cart/items", {
-        deviceVariantId: variantId,
-        quantity,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
-      toast({
-        title: "Added to cart",
-        description: "Item successfully added to your cart",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add item to cart",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Filter devices
-  const filteredDevices = devices?.filter((device) => {
-    const matchesSearch = 
-      device.marketingName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.brand.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || device.categoryId === selectedCategory;
-    const matchesBrand = selectedBrand === "all" || device.brand === selectedBrand;
-    return matchesSearch && matchesCategory && matchesBrand;
-  }) || [];
-
-  // Get unique brands
-  const brands = Array.from(new Set(devices?.map((d) => d.brand) || [])).sort();
-
-  // Quantity management
-  const getSelectedVariantId = (device: Device) => selectedVariants[device.id] || device.variants?.[0]?.id || "";
-
-  const getQuantity = (variantId: string) => quantities[variantId] || 1;
-
-  const updateQuantity = (variantId: string, change: number, maxQuantity?: number) => {
-    const currentQty = getQuantity(variantId);
-    const safeMax = maxQuantity ?? Number.MAX_SAFE_INTEGER;
-    const newQty = Math.max(1, Math.min(safeMax, currentQty + change));
-    setQuantities((prev) => ({ ...prev, [variantId]: newQty }));
-  };
-
-  const handleQuantityInput = (variantId: string, value: string, maxQuantity?: number) => {
-    const parsed = parseInt(value, 10);
-    const safeMax = maxQuantity ?? Number.MAX_SAFE_INTEGER;
-    const numericValue = Number.isNaN(parsed) ? 1 : parsed;
-    const safeValue = Math.max(1, Math.min(safeMax, numericValue));
-    setQuantities((prev) => ({ ...prev, [variantId]: safeValue }));
-  };
-
-  const handleVariantSelect = (deviceId: string, variantId: string) => {
-    setSelectedVariants((prev) => ({ ...prev, [deviceId]: variantId }));
-    setQuantities((prev) => ({ ...prev, [variantId]: prev[variantId] ?? 1 }));
-  };
-
   return (
-    <div className="flex min-h-screen flex-col">
-      <UnifiedHeader />
-      
-      <main className="flex-1">
-        {/* Header */}
-        <section className="border-b bg-muted/30 py-12">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h1 className="mb-4 text-4xl font-bold tracking-tight text-center sm:text-left" data-testid="text-catalog-headline">
-              Wholesale Device Catalog
-            </h1>
-            <p className="max-w-2xl text-lg text-muted-foreground text-center sm:text-left">
-              Browse our certified pre-owned devices with wholesale tiered pricing
-            </p>
-          </div>
-        </section>
-
-        {/* Catalog Content */}
-        <section className="py-12">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            {/* Filters */}
-            <div className="mb-8 space-y-4">
-              {/* Search and Filters */}
-              <div className="flex flex-wrap gap-4">
-                <div className="relative flex-1 min-w-64">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search devices..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9"
-                    data-testid="input-search"
-                  />
+    <BuyerLayout>
+      <PageShell
+        title="Live catalog"
+        description="Filter by condition, carrier, or storage to quickly lock in the inventory you need."
+        badge="Inventory"
+        actions={<Button asChild><a href="/buyer/quotes/new">Request quote</a></Button>}
+      >
+        <div className="grid gap-6 lg:grid-cols-4">
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Layers className="h-4 w-4" />Filters</CardTitle>
+              <CardDescription>Curate exactly what you need</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Search devices" className="w-full" />
                 </div>
-                
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-48" data-testid="select-category">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories?.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-                  <SelectTrigger className="w-48" data-testid="select-brand">
-                    <SelectValue placeholder="All Brands" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Brands</SelectItem>
-                    {brands.map((brand) => (
-                      <SelectItem key={brand} value={brand}>
-                        {brand}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Button variant="secondary" className="w-full">Apply filters</Button>
               </div>
 
-              {/* Results Count */}
-              {!devicesLoading && (
-                <p className="text-sm text-muted-foreground">
-                  Showing {filteredDevices.length} of {devices?.length || 0} devices
-                </p>
-              )}
-            </div>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Condition</p>
+                {filters.conditions.map((condition) => (
+                  <label key={condition} className="flex items-center gap-2 text-sm">
+                    <Checkbox />
+                    {condition}
+                  </label>
+                ))}
+              </div>
 
-            {/* Loading State */}
-            {devicesLoading && (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <Card key={i}>
-                    <Skeleton className="aspect-[4/3] w-full" />
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Carrier</p>
+                {filters.carriers.map((carrier) => (
+                  <label key={carrier} className="flex items-center gap-2 text-sm">
+                    <Checkbox />
+                    {carrier}
+                  </label>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Storage</p>
+                {filters.storage.map((size) => (
+                  <label key={size} className="flex items-center gap-2 text-sm">
+                    <Checkbox />
+                    {size}
+                  </label>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Budget per unit</p>
+                <Slider defaultValue={[420]} max={800} step={10} />
+                <p className="text-xs text-muted-foreground">Show options at or below $420/unit</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="lg:col-span-3 space-y-4">
+            <Tabs defaultValue="featured" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="featured">Featured</TabsTrigger>
+                <TabsTrigger value="new">New arrivals</TabsTrigger>
+                <TabsTrigger value="saved">Saved searches</TabsTrigger>
+              </TabsList>
+              <TabsContent value="featured" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {catalog.map((item) => (
+                  <Card key={item.title} className="flex flex-col justify-between hover-elevate">
                     <CardHeader>
-                      <Skeleton className="h-6 w-20 mb-2" />
-                      <Skeleton className="h-7 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary">{item.badge}</Badge>
+                        <Button variant="ghost" size="icon">
+                          <Heart className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <CardTitle>{item.title}</CardTitle>
+                      <CardDescription>{item.subtitle}</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <Skeleton className="h-20 w-full" />
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Starting at</p>
+                          <p className="text-2xl font-semibold">{item.price}</p>
+                        </div>
+                        <Badge>{item.tiers}</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button asChild className="flex-1">
+                          <a href="/buyer/devices/sample">View lot</a>
+                        </Button>
+                        <Button variant="outline" size="icon">
+                          <ShoppingCart className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
-              </div>
-            )}
-
-            {/* Device Grid */}
-            {!devicesLoading && filteredDevices.length > 0 && (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredDevices.map((device) => {
-                  const selectedVariantId = getSelectedVariantId(device);
-                  const selectedVariant = device.variants?.find((variant) => variant.id === selectedVariantId);
-                  const maxAvailable = selectedVariant?.inventory?.quantityAvailable;
-                  const quantityValue = selectedVariantId ? getQuantity(selectedVariantId) : 1;
-
-                  const goToDetails = () => setLocation(`/buyer/devices/${device.slug}`);
-
-                  return (
-                    <Card
-                      key={device.id}
-                      className="hover-elevate cursor-pointer"
-                      data-testid={`card-device-${device.id}`}
-                      onClick={goToDetails}
-                      tabIndex={0}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          goToDetails();
-                        }
-                      }}
-                    >
-                      <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
-                        {device.imageUrl ? (
-                          <img
-                            src={device.imageUrl}
-                            alt={`${device.brand} ${device.marketingName}`}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <Smartphone className="h-16 w-16 text-muted-foreground" />
-                        )}
-                      </div>
-                      <CardHeader>
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary">{device.categoryName}</Badge>
-                          {device.variantCount > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {device.variantCount} variant{device.variantCount !== 1 ? "s" : ""}
-                            </Badge>
-                          )}
-                        </div>
-                        <CardTitle className="text-lg">
-                          {device.brand} {device.marketingName}
-                        </CardTitle>
-                        {device.description && (
-                          <CardDescription className="line-clamp-2">
-                            {device.description}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3 text-sm">
-                          {device.availableStorage && device.availableStorage.length > 0 && (
-                            <div>
-                              <p className="text-muted-foreground mb-1">Storage:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {device.availableStorage.slice(0, 4).map((storage) => (
-                                  <Badge key={storage} variant="outline" className="text-xs">
-                                    {storage}
-                                  </Badge>
-                                ))}
-                                {device.availableStorage.length > 4 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{device.availableStorage.length - 4}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {device.availableConditions && device.availableConditions.length > 0 && (
-                            <div>
-                              <p className="text-muted-foreground mb-1">Conditions:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {device.availableConditions.map((condition) => (
-                                  <Badge key={condition} variant="outline" className="text-xs">
-                                    Grade {condition}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {device.variants && device.variants.length > 0 && (
-                          <div className="mt-4 space-y-2">
-                            <p className="text-sm font-medium text-muted-foreground">Variant</p>
-                            <Select
-                              value={selectedVariantId}
-                              onValueChange={(value) => handleVariantSelect(device.id, value)}
-                              disabled={!selectedVariantId}
-                            >
-                              <SelectTrigger
-                                onClick={(event) => event.stopPropagation()}
-                                data-testid={`select-variant-${device.id}`}
-                              >
-                                <SelectValue placeholder="Choose a variant" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {device.variants.map((variant) => (
-                                  <SelectItem key={variant.id} value={variant.id}>
-                                    {variant.storage} • {variant.color} • Grade {variant.conditionGrade}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-
-                        {/* Quantity Selector */}
-                        <div className="mt-4 flex items-center gap-2">
-                          <span className="text-sm font-medium">Quantity:</span>
-                          <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (selectedVariantId) {
-                                  updateQuantity(selectedVariantId, -1);
-                                }
-                              }}
-                              disabled={!selectedVariantId}
-                              data-testid={`button-decrease-${device.id}`}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={quantityValue}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(e) => {
-                                if (selectedVariantId) {
-                                  handleQuantityInput(selectedVariantId, e.target.value, maxAvailable);
-                                }
-                              }}
-                              className="h-8 w-16 text-center"
-                              disabled={!selectedVariantId}
-                              data-testid={`input-quantity-${device.id}`}
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (selectedVariantId) {
-                                  updateQuantity(selectedVariantId, 1, maxAvailable);
-                                }
-                              }}
-                              disabled={!selectedVariantId}
-                              data-testid={`button-increase-${device.id}`}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                        {maxAvailable && (
-                          <p className="mt-2 text-xs text-muted-foreground">{maxAvailable} units available</p>
-                        )}
-
-                        <div className="mt-3 flex gap-2" onClick={(event) => event.stopPropagation()}>
-                          <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              goToDetails();
-                            }}
-                            data-testid={`button-view-${device.id}`}
-                          >
-                            View Details
-                          </Button>
-                          {selectedVariantId && (
-                            <>
-                              <SaveToListButton
-                                deviceVariantId={selectedVariantId}
-                                deviceName={device.marketingName}
-                                variant="outline"
-                                size="sm"
-                              />
-                              <Button
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  addToCartMutation.mutate({
-                                    variantId: selectedVariantId,
-                                    quantity: quantityValue,
-                                  });
-                                }}
-                                disabled={addToCartMutation.isPending}
-                                data-testid={`button-add-cart-${device.id}`}
-                              >
-                                {addToCartMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <ShoppingCart className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Empty State */}
-            {!devicesLoading && filteredDevices.length === 0 && devices && devices.length > 0 && (
-              <div className="py-16 text-center">
-                <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-lg font-medium mb-2">No devices found</p>
-                <p className="text-muted-foreground">Try adjusting your filters or search term</p>
-              </div>
-            )}
-
-            {/* No Devices at All */}
-            {!devicesLoading && devices && devices.length === 0 && (
-              <div className="py-16 text-center">
-                <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-lg font-medium mb-2">No devices available</p>
-                <p className="text-muted-foreground">Check back later for new inventory</p>
-              </div>
-            )}
+              </TabsContent>
+              <TabsContent value="new">
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle>Fresh inventory arriving daily</CardTitle>
+                    <CardDescription>Save your filters to be notified the moment stock lands.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="secondary">Save this search</Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="saved">
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle>No saved searches yet</CardTitle>
+                    <CardDescription>Create a search and we’ll alert you when it matches.</CardDescription>
+                  </CardHeader>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
-        </section>
-      </main>
-
-      <PublicFooter />
-    </div>
+        </div>
+      </PageShell>
+    </BuyerLayout>
   );
 }
