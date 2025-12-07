@@ -11,8 +11,8 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { Heart, Plus, Trash2, FolderOpen } from "lucide-react";
 import type { SavedList } from "@shared/schema";
-import { UnifiedHeader } from "@/components/UnifiedHeader";
-import { PublicFooter } from "@/components/PublicFooter";
+import { BuyerLayout } from "@/components/BuyerLayout";
+import { PageShell } from "@/components/PageShell";
 
 export default function SavedLists() {
   const { toast } = useToast();
@@ -68,125 +68,100 @@ export default function SavedLists() {
   });
 
   const handleCreateList = () => {
-    if (!listName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a list name",
-        variant: "destructive",
-      });
-      return;
-    }
-    createListMutation.mutate(listName);
+    if (!listName.trim()) return;
+    createListMutation.mutate(listName.trim());
   };
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingListId, setDeletingListId] = useState<string | null>(null);
-
-  const confirmDeleteList = (id: string) => {
-    setDeletingListId(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const performDelete = () => {
-    if (!deletingListId) return;
-    deleteListMutation.mutate(deletingListId);
-    setDeleteDialogOpen(false);
-    setDeletingListId(null);
+  const handleDeleteList = (id: string) => {
+    deleteListMutation.mutate(id);
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <UnifiedHeader />
-      <main className="flex-1 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="space-y-8">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="text-center sm:text-left">
-                <h1 className="text-3xl font-semibold tracking-tight">Saved Lists</h1>
-                <p className="text-muted-foreground mt-1">Organize devices for quick ordering</p>
-              </div>
-              <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-list">
-                <Plus className="h-4 w-4 mr-2" />
-                Create New List
-              </Button>
-            </div>
-
-            {isLoading ? (
-        <div className="text-center py-12">
-          <Heart className="h-12 w-12 mx-auto mb-2 opacity-50 animate-pulse" />
-          <p className="text-muted-foreground">Loading saved lists...</p>
-        </div>
-      ) : savedLists && savedLists.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {savedLists.map((list) => (
-            <Card key={list.id} data-testid={`card-list-${list.id}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{list.name}</CardTitle>
+    <BuyerLayout>
+      <PageShell
+        title="Saved Lists"
+        description="Organize and reorder your favorite device mixes"
+        className="mx-auto max-w-6xl"
+        actions={
+          <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-list">
+            <Plus className="mr-2 h-4 w-4" />
+            New List
+          </Button>
+        }
+      >
+        {isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="h-6 w-40 animate-pulse rounded bg-muted" />
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        ) : savedLists && savedLists.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {savedLists.map((list) => (
+              <Card key={list.id}>
+                <CardHeader className="flex flex-row items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Heart className="h-4 w-4 text-primary" />
+                      {list.name}
+                    </CardTitle>
                     <CardDescription>
-                      Created {format(new Date(list.createdAt), "MMM d, yyyy")}
+                      {list.items?.length || 0} items • Updated {format(new Date(list.updatedAt), "MMM d, yyyy")}
                     </CardDescription>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => confirmDeleteList(list.id)}
-                    disabled={deleteListMutation.isPending}
-                    data-testid={`button-delete-${list.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Link href={`/buyer/saved-lists/${list.id}`}>
-                  <Button variant="outline" className="w-full" data-testid={`button-view-${list.id}`}>
-                    <FolderOpen className="h-4 w-4 mr-2" />
-                    View List
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-semibold mb-2">No saved lists yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Create a list to save devices for quick ordering
-            </p>
-            <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Your First List
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+                  <div className="flex gap-2">
+                    <Button asChild variant="outline" size="sm" data-testid={`button-open-${list.id}`}>
+                      <Link href={`/buyer/saved-lists/${list.id}`}>
+                        <FolderOpen className="mr-2 h-4 w-4" />
+                        Open
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteList(list.id)}
+                      data-testid={`button-delete-${list.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Heart className="mb-4 h-16 w-16 text-muted-foreground" />
+              <h2 className="mb-2 text-2xl font-semibold">No saved lists yet</h2>
+              <p className="mb-6 text-center text-muted-foreground">Create your first saved list to keep devices handy.</p>
+              <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-list">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Saved List
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </PageShell>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Saved List</DialogTitle>
-            <DialogDescription>
-              Give your new list a descriptive name
-            </DialogDescription>
+            <DialogDescription>Give your list a name to group related devices.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="listName">List Name</Label>
+              <Label htmlFor="listName">List name</Label>
               <Input
                 id="listName"
-                placeholder="e.g., Monthly Restock, iPhone Batch #1"
+                placeholder="e.g. Grade A iPhones"
                 value={listName}
                 onChange={(e) => setListName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleCreateList();
-                  }
-                }}
                 data-testid="input-list-name"
               />
             </div>
@@ -195,32 +170,12 @@ export default function SavedLists() {
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleCreateList}
-              disabled={createListMutation.isPending}
-              data-testid="button-save-list"
-            >
-              {createListMutation.isPending ? "Creating..." : "Create List"}
+            <Button onClick={handleCreateList} disabled={createListMutation.isLoading}>
+              {createListMutation.isLoading ? "Creating..." : "Create"}
             </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete Saved List</DialogTitle>
-                <DialogDescription>Are you sure you want to delete this saved list? This action cannot be undone.</DialogDescription>
-              </DialogHeader>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-                <Button onClick={performDelete} disabled={deleteListMutation.isPending}>Delete</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          </div>
-        </div>
-      </main>
-      <PublicFooter />
-    </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </BuyerLayout>
   );
 }
