@@ -25,7 +25,7 @@ export default function About() {
     { year: "2020", event: "Reached 500+ wholesale customers and expanded to second warehouse facility" },
     { year: "2021", event: "Launched tiered pricing platform and introduced net terms for qualified buyers" },
     { year: "2022", event: "Processed 100,000+ devices and achieved 99% customer satisfaction rating" },
-    { year: "2023", event: "Opened third distribution center and expanded inventory to 15,000+ SKUs" },
+    { year: "2023", event: "Opened third distribution center and expanded inventory to 15,000+ devices" },
   ];
 
   const grades = [

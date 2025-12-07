@@ -145,7 +145,6 @@ export default function OrderDetail() {
                             {item.deviceName || "Device"}
                           </h3>
                           <p className="text-sm text-muted-foreground mt-1">
-                            SKU: {item.sku || "N/A"}
                           </p>
                           <div className="flex gap-4 mt-2 text-sm">
                             <span className="text-muted-foreground">Qty: {item.quantity}</span>
