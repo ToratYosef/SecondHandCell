@@ -224,7 +224,7 @@ export default function Home() {
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
               {categories.map((category) => (
-                <Link key={category.slug} href={`buyer3/catalog?category=${category.slug}`}>
+                <Link key={category.slug} href={`buyer/catalog?category=${category.slug}`}>
                   <Card className="group overflow-hidden hover-elevate active-elevate-2" data-testid={`card-category-${category.slug}`}>
                     <div
                       className={`flex aspect-[4/3] items-center justify-center bg-gradient-to-br ${category.gradient}`}
