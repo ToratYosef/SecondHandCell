@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { auth, db, signInAsGuest, signInWithGoogle } from "@/lib/firebase";
+import { auth, db, signInWithGoogle } from "@/lib/firebase";
 import type { User } from "@shared/schema";
 
 interface FirebaseProfile extends User {
@@ -49,7 +49,7 @@ export function useFirebaseUser() {
 
   const isAdmin = useMemo(() => profile?.role === "admin" || profile?.role === "super_admin", [profile]);
 
-  return { firebaseUser, profile, isAdmin, loading, signInWithGoogle, signInAsGuest };
+  return { firebaseUser, profile, isAdmin, loading, signInWithGoogle };
 }
 
 async function ensureProfile(user: FirebaseUser) {

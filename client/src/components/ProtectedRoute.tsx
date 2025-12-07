@@ -45,7 +45,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
           description={
             requiredRole === "admin"
               ? "Only approved admins can open catalog operations. Sign in to request access."
-              : "Sign in with Google or browse as a guest."
+              : "Sign in with Google or email to continue."
           }
         />
       </div>

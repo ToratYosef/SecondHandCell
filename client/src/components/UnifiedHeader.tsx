@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, ShoppingCart } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -12,6 +12,12 @@ import { useFirebaseUser } from "@/hooks/useFirebaseUser";
 export function UnifiedHeader() {
   const { isAdmin, profile } = useFirebaseUser();
   const [showGate, setShowGate] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setShowGate(false);
+    }
+  }, [profile]);
 
   const { data: cart } = useQuery<any>({
     queryKey: ["/api/cart"],
@@ -160,7 +166,7 @@ export function UnifiedHeader() {
       {showGate && (
         <AuthOverlay
           title="Catalog is admin-only"
-          description="Sign in or continue as a guest to request admin access."
+          description="Sign in with email or Google to request admin access."
         />
       )}
     </header>

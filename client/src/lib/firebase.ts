@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -22,10 +22,6 @@ googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export async function signInWithGoogle() {
   await signInWithPopup(auth, googleProvider);
-}
-
-export async function signInAsGuest() {
-  await signInAnonymously(auth);
 }
 
 export { app };

@@ -9,7 +9,8 @@
     "start": "vite preview",
     "check": "tsc",
     "test": "jest --runInBand",
-    "create:admin": "node scripts/create-admin-user.js"
+    "create:admin": "node scripts/create-admin-user.js",
+    "create:buyer": "node scripts/create-buyer-user.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -11,6 +11,7 @@ import {
   LogOut,
   FileCheck,
   BarChart,
+  ClipboardList,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { signOut } from "firebase/auth";
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Catalog", href: "/admin/inventory", icon: Package },
+  { name: "Applications", href: "/admin/applications", icon: ClipboardList },
   { name: "Companies", href: "/admin/companies", icon: Building2 },
   { name: "Reports", href: "/admin/reports", icon: BarChart },
   { name: "Orders", href: "/admin/orders", icon: FileText },

@@ -11,9 +11,9 @@ import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { ShieldCheck, Smartphone, Zap, ArrowRight, Loader2, LogIn } from "lucide-react";
+import { ShieldCheck, Smartphone, Zap, ArrowRight, LogIn } from "lucide-react";
 import warehouseHeroBackground from "@assets/generated_images/Warehouse_hero_background_image_8f8c1570.png";
-import { auth, signInAsGuest, signInWithGoogle } from "@/lib/firebase";
+import { auth, signInWithGoogle } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
 const loginSchema = z.object({
@@ -69,20 +69,6 @@ export default function LoginNew() {
       toast({
         title: "Google sign-in failed",
         description: "Please try again or use email login.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleGuest = async () => {
-    try {
-      await signInAsGuest();
-      toast({ title: "Browsing as guest", description: "You can preview catalog items." });
-      setLocation("/admin/dashboard");
-    } catch (error) {
-      toast({
-        title: "Guest sign-in failed",
-        description: "Please try a different method.",
         variant: "destructive",
       });
     }
@@ -211,10 +197,6 @@ export default function LoginNew() {
               <div className="grid gap-2">
                 <Button variant="outline" className="w-full" onClick={handleGoogle}>
                   <LogIn className="mr-2 h-4 w-4" /> Sign in with Google
-                </Button>
-                <Button variant="ghost" className="w-full" onClick={handleGuest}>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Browse as guest
                 </Button>
               </div>
 
