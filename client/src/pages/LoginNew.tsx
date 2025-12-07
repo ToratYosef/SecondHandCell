@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck, Smartphone, Zap, ArrowRight } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { ShieldCheck, Smartphone, Zap, ArrowRight, Loader2, LogIn } from "lucide-react";
 import warehouseHeroBackground from "@assets/generated_images/Warehouse_hero_background_image_8f8c1570.png";
+import { auth, signInAsGuest, signInWithGoogle } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -23,7 +24,6 @@ const loginSchema = z.object({
 export default function LoginNew() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const {
     register,
@@ -43,11 +43,10 @@ export default function LoginNew() {
 
   const loginMutation = useMutation({
     mutationFn: async (values: z.infer<typeof loginSchema>) => {
-      return apiRequest("POST", "/api/auth/login", values);
+      await signInWithEmailAndPassword(auth, values.email, values.password);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
-      setLocation("/buyer/dashboard");
+      setLocation("/admin/dashboard");
       toast({
         title: "Welcome back",
         description: "You are now signed in and ready to browse inventory",
@@ -61,6 +60,33 @@ export default function LoginNew() {
       });
     },
   });
+
+  const handleGoogle = async () => {
+    try {
+      await signInWithGoogle();
+      setLocation("/admin/dashboard");
+    } catch (error) {
+      toast({
+        title: "Google sign-in failed",
+        description: "Please try again or use email login.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGuest = async () => {
+    try {
+      await signInAsGuest();
+      toast({ title: "Browsing as guest", description: "You can preview catalog items." });
+      setLocation("/admin/dashboard");
+    } catch (error) {
+      toast({
+        title: "Guest sign-in failed",
+        description: "Please try a different method.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const onSubmit = (values: z.infer<typeof loginSchema>) => {
     loginMutation.mutate(values);
@@ -156,9 +182,7 @@ export default function LoginNew() {
                     {...register("email")}
                     className={errors.email ? "border-destructive" : ""}
                   />
-                  {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email.message}</p>
-                  )}
+                  {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -176,9 +200,7 @@ export default function LoginNew() {
                     {...register("password")}
                     className={errors.password ? "border-destructive" : ""}
                   />
-                  {errors.password && (
-                    <p className="text-sm text-destructive">{errors.password.message}</p>
-                  )}
+                  {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
                 </div>
 
                 <Button type="submit" className="w-full" size="lg" disabled={loginMutation.isPending}>
@@ -186,8 +208,18 @@ export default function LoginNew() {
                 </Button>
               </form>
 
+              <div className="grid gap-2">
+                <Button variant="outline" className="w-full" onClick={handleGoogle}>
+                  <LogIn className="mr-2 h-4 w-4" /> Sign in with Google
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={handleGuest}>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Browse as guest
+                </Button>
+              </div>
+
               <div className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
-                New to SecondHand(Whole)Cell? {" "}
+                New to SecondHand(Whole)Cell?{" "}
                 <Link href="/register" className="font-semibold text-primary">
                   Apply for a wholesale account
                 </Link>
