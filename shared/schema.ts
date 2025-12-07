@@ -81,6 +81,7 @@ export type CatalogItem = {
   id: string;
   model: string;
   brand?: string;
+  slug?: string;
   storage?: string;
   condition?: string;
   price?: number;

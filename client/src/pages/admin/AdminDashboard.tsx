@@ -10,16 +10,27 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { useCatalog } from "@/hooks/useCatalog";
 import { AuthOverlay } from "@/components/AuthOverlay";
 import { useFirebaseUser } from "@/hooks/useFirebaseUser";
-import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, Plus } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
   const { items, summary, loading } = useCatalog();
   const { isAdmin, profile } = useFirebaseUser();
+  const { toast } = useToast();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({ model: "", brand: "", storage: "", condition: "", price: "" });
   const [isSaving, setSaving] = useState(false);
+  const [importJson, setImportJson] = useState(
+    `[
+  { "brand": "Iphone", "device": "IPHONE 12 PRO", "slug": "12-pro", "storages": ["128GB", "256GB", "512GB"] }
+]`
+  );
+  const [parsedDevices, setParsedDevices] = useState<ParsedDevice[]>([]);
+  const [isImporting, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const latestItems = useMemo(() => items.slice(0, 5), [items]);
 
@@ -36,6 +47,73 @@ export default function AdminDashboard() {
     setSaving(false);
     setDialogOpen(false);
     setNewItem({ model: "", brand: "", storage: "", condition: "", price: "" });
+  };
+
+  const handleConvertJson = () => {
+    try {
+      const parsed = parseDevicePayload(importJson);
+      setParsedDevices(parsed);
+      setImportError(null);
+      toast({
+        title: "Payload converted",
+        description: `Ready to import ${parsed.length} model${parsed.length === 1 ? "" : "s"}.`,
+      });
+    } catch (error: any) {
+      setParsedDevices([]);
+      setImportError(error.message || "Unable to parse JSON payload");
+      toast({
+        title: "Invalid JSON",
+        description: error.message || "Follow the devices.json format and try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImportDevices = async () => {
+    if (!isAdmin) {
+      toast({ title: "Admin required", description: "Sign in as an admin to import devices." });
+      return;
+    }
+
+    if (parsedDevices.length === 0) {
+      toast({ title: "Nothing to import", description: "Convert JSON to devices first." });
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const batch = writeBatch(db);
+      parsedDevices.forEach((device) => {
+        const storages = device.storages.length > 0 ? device.storages : [""];
+        storages.forEach((storage) => {
+          const ref = doc(collection(db, "catalog"));
+          batch.set(ref, {
+            brand: device.brand,
+            model: device.device,
+            slug: device.slug,
+            storage: storage || undefined,
+            condition: "Unspecified",
+            price: 0,
+            status: "live",
+            updatedAt: serverTimestamp(),
+            createdBy: profile?.email ?? "",
+          });
+        });
+      });
+
+      await batch.commit();
+      toast({ title: "Import complete", description: `${parsedDevices.length} model(s) published to Firestore.` });
+      setParsedDevices([]);
+      setImportJson("");
+    } catch (error: any) {
+      toast({
+        title: "Import failed",
+        description: error.message || "Could not save devices to Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
   };
 
   return (
@@ -152,6 +230,73 @@ export default function AdminDashboard() {
               )}
             </CardContent>
           </Card>
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Bulk import from JSON</CardTitle>
+              <CardDescription>Paste the devices.json payload to preview and publish to Firestore.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>JSON payload</Label>
+                <Textarea
+                  value={importJson}
+                  onChange={(e) => setImportJson(e.target.value)}
+                  className="min-h-[200px] font-mono"
+                  placeholder="Paste the contents of devices.json here"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Accepts the same array structure as devices.json (brand, device, slug, storages).
+                </p>
+                {importError && <p className="text-sm text-destructive">{importError}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={handleConvertJson}>
+                  Convert JSON to devices
+                </Button>
+                <Button variant="outline" onClick={() => setParsedDevices([])}>
+                  Clear preview
+                </Button>
+              </div>
+
+              {parsedDevices.length > 0 && (
+                <div className="space-y-3">
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                    Ready to import {parsedDevices.length} model{parsedDevices.length === 1 ? "" : "s"}.
+                  </div>
+                  <div className="overflow-x-auto rounded-md border">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-muted/60 text-left">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">Brand</th>
+                          <th className="px-3 py-2 font-semibold">Device</th>
+                          <th className="px-3 py-2 font-semibold">Slug</th>
+                          <th className="px-3 py-2 font-semibold">Storages</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedDevices.map((device) => (
+                          <tr key={`${device.brand}-${device.device}-${device.slug}`} className="border-t">
+                            <td className="px-3 py-2">{device.brand}</td>
+                            <td className="px-3 py-2 font-medium uppercase">{device.device}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{device.slug || "—"}</td>
+                            <td className="px-3 py-2">{device.storages.join(", ") || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-end gap-3">
+                    <Button variant="outline" onClick={() => setParsedDevices([])}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleImportDevices} disabled={isImporting || !isAdmin}>
+                      {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirm and import
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="rules">
           <Card>
@@ -204,6 +349,53 @@ function StatCard({ title, value, hint }: { title: string; value: string; hint: 
       <CardContent className="pt-0 text-sm text-muted-foreground">{hint}</CardContent>
     </Card>
   );
+}
+
+type ParsedDevice = {
+  brand: string;
+  device: string;
+  slug?: string;
+  storages: string[];
+};
+
+function parseDevicePayload(raw: string): ParsedDevice[] {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error: any) {
+    throw new Error("JSON could not be parsed. Double-check the payload.");
+  }
+
+  const entries = Array.isArray(parsed)
+    ? parsed
+    : parsed?.devices || parsed?.models || parsed?.data || parsed?.items || [];
+
+  if (!Array.isArray(entries)) {
+    throw new Error("Expected an array of devices or a { devices: [] } object.");
+  }
+
+  return entries.map((entry, index) => {
+    const brand = entry.brand || entry.make || "";
+    const device = entry.device || entry.model || entry.name || "";
+    const slug = entry.slug || entry.handle || "";
+    const storagesRaw = entry.storages ?? entry.storageOptions ?? entry.storage ?? [];
+    const storages = Array.isArray(storagesRaw)
+      ? storagesRaw
+      : typeof storagesRaw === "string"
+        ? storagesRaw.split(",").map((value: string) => value.trim()).filter(Boolean)
+        : [];
+
+    if (!brand || !device) {
+      throw new Error(`Row ${index + 1} is missing required brand or device fields.`);
+    }
+
+    return {
+      brand,
+      device,
+      slug,
+      storages,
+    } as ParsedDevice;
+  });
 }
 
 function EmptyState() {
