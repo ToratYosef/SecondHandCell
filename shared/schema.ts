@@ -88,3 +88,28 @@ export type CatalogItem = {
   imageUrl?: string | null;
   updatedAt?: string | number | Date;
 };
+
+export type WholesaleApplication = {
+  id?: string;
+  userId?: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  passwordDigest?: string | null;
+  companyName: string;
+  legalName?: string;
+  website?: string;
+  taxId?: string;
+  businessType: string;
+  resellerCertificateName?: string | null;
+  contactName: string;
+  addressPhone: string;
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  status?: "submitted" | "in_review" | "approved" | "rejected";
+  createdAt?: string | number | Date;
+  updatedAt?: string | number | Date;
+};
