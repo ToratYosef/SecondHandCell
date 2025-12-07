@@ -914,7 +914,7 @@ export default function Inventory() {
                 value={importJson}
                 onChange={(e) => setImportJson(e.target.value)}
                 className="min-h-[240px] font-mono"
-                placeholder="[{ \"brand\": \"Iphone\", \"name\": \"IPHONE 12 PRO\", \"variants\": [...] }]"
+                placeholder='[{ "brand": "Iphone", "name": "IPHONE 12 PRO", "variants": [...] }]'
               />
               <p className="text-xs text-muted-foreground">
                 Format matches <code>devices.json</code>: brand, name, imageUrl, category, and a <code>variants</code> array with storage, networkLockStatus, conditionGrade, unitPrice, and quantity.
