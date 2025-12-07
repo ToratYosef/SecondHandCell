@@ -51,6 +51,7 @@ import AdminUsers from "@/pages/admin/Users";
 import AdminSettings from "@/pages/admin/Settings";
 import AdminReports from "@/pages/admin/Reports";
 import Applications from "@/pages/admin/Applications";
+import AdminLogin from "@/pages/admin/AdminLogin";
 
 function Router() {
   return (
@@ -67,6 +68,7 @@ function Router() {
       
       {/* Auth Pages */}
       <Route path="/login" component={Login} />
+      <Route path="/admin" component={AdminLogin} />
       <Route path="/register" component={Register} />
       <Route path="/register/thanks" component={RegisterThanks} />
       <Route path="/forgot-password" component={ForgotPassword} />

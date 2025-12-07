@@ -15,6 +15,7 @@ import { ShieldCheck, Smartphone, Zap, ArrowRight, LogIn } from "lucide-react";
 import warehouseHeroBackground from "@assets/generated_images/Warehouse_hero_background_image_8f8c1570.png";
 import { auth, signInWithGoogle } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { useFirebaseUser } from "@/hooks/useFirebaseUser";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -24,6 +25,7 @@ const loginSchema = z.object({
 export default function LoginNew() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { profile, isAdmin } = useFirebaseUser();
 
   const {
     register,
@@ -41,12 +43,18 @@ export default function LoginNew() {
     document.title = "Sign in | SecondHand(Whole)Cell";
   }, []);
 
+  useEffect(() => {
+    if (profile) {
+      setLocation(isAdmin ? "/admin/dashboard" : "/buyer/dashboard");
+    }
+  }, [profile, isAdmin, setLocation]);
+
   const loginMutation = useMutation({
     mutationFn: async (values: z.infer<typeof loginSchema>) => {
       await signInWithEmailAndPassword(auth, values.email, values.password);
     },
     onSuccess: async () => {
-      setLocation("/admin/dashboard");
+      setLocation("/buyer/dashboard");
       toast({
         title: "Welcome back",
         description: "You are now signed in and ready to browse inventory",
@@ -64,7 +72,7 @@ export default function LoginNew() {
   const handleGoogle = async () => {
     try {
       await signInWithGoogle();
-      setLocation("/admin/dashboard");
+      setLocation("/buyer/dashboard");
     } catch (error) {
       toast({
         title: "Google sign-in failed",

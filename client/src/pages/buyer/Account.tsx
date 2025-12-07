@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,33 +5,14 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { User, Building2, Phone, Mail, Shield, Calendar, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
-import { useToast } from "@/hooks/use-toast";
-import type { User as UserType, Company } from "@shared/schema";
+import { useFirebaseUser } from "@/hooks/useFirebaseUser";
 import { UnifiedHeader } from "@/components/UnifiedHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 
-interface ProfileData extends Omit<UserType, "passwordHash"> {
-  company: Company | null;
-  roleInCompany: string | null;
-}
-
 export default function Account() {
-  const { toast } = useToast();
-  const { data: profile, isLoading, error, refetch } = useQuery<ProfileData>({
-    queryKey: ["/api/profile"],
-  });
+  const { profile, loading } = useFirebaseUser();
 
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "Error loading profile",
-        description: error instanceof Error ? error.message : "Failed to load account information",
-        variant: "destructive",
-      });
-    }
-  }, [error, toast]);
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex min-h-screen flex-col">
         <UnifiedHeader />
@@ -52,7 +31,7 @@ export default function Account() {
     );
   }
 
-  if (error || !profile) {
+  if (!profile) {
     return (
       <div className="flex min-h-screen flex-col">
         <UnifiedHeader />
@@ -65,16 +44,11 @@ export default function Account() {
               </div>
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
+                <AlertTitle>Sign in required</AlertTitle>
                 <AlertDescription className="flex items-center justify-between">
-                  <span data-testid="text-error-message">Failed to load account information. Please try again.</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => refetch()}
-                    data-testid="button-retry"
-                  >
-                    Retry
+                  <span data-testid="text-error-message">You need to sign in to view your account.</span>
+                  <Button asChild variant="outline" size="sm" data-testid="button-retry">
+                    <Link href="/login">Sign in</Link>
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -100,15 +74,26 @@ export default function Account() {
     }
   };
 
-  const formatStatus = (status: string) => {
-    return status
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+  const parseDate = (value: unknown) => {
+    if (!value) return null;
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+    if (typeof value === "string" || typeof value === "number") {
+      const parsed = new Date(value);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (typeof value === "object" && value !== null && "toDate" in value) {
+      // Support Firestore Timestamp objects
+      const parsed = (value as { toDate: () => Date }).toDate();
+      return parsed instanceof Date && !isNaN(parsed.getTime()) ? parsed : null;
+    }
+    return null;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateString: unknown) => {
+    const parsed = parseDate(dateString);
+    if (!parsed) return "Not available";
+
+    return parsed.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -149,14 +134,14 @@ export default function Account() {
           <CardContent className="space-y-4">
             <div>
               <div className="text-sm font-medium text-muted-foreground">Name</div>
-              <div className="text-base mt-1" data-testid="text-user-name">{profile.name}</div>
+              <div className="text-base mt-1" data-testid="text-user-name">{profile.name || "No name on file"}</div>
             </div>
             <Separator />
             <div>
               <div className="text-sm font-medium text-muted-foreground">Email</div>
               <div className="flex items-center gap-2 mt-1">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span data-testid="text-user-email">{profile.email}</span>
+                <span data-testid="text-user-email">{profile.email || "No email on file"}</span>
               </div>
             </div>
             <Separator />
@@ -164,7 +149,7 @@ export default function Account() {
               <div className="text-sm font-medium text-muted-foreground">Phone</div>
               <div className="flex items-center gap-2 mt-1">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                <span data-testid="text-user-phone">{profile.phone || "Not provided"}</span>
+                <span data-testid="text-user-phone">{"phone" in profile && (profile as any).phone ? (profile as any).phone : "Not provided"}</span>
               </div>
             </div>
             <Separator />
@@ -182,7 +167,7 @@ export default function Account() {
               <div className="text-sm font-medium text-muted-foreground">Member Since</div>
               <div className="flex items-center gap-2 mt-1">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span data-testid="text-member-since">{formatDate(new Date(profile.createdAt).toISOString())}</span>
+                <span data-testid="text-member-since">{formatDate(profile.createdAt)}</span>
               </div>
             </div>
           </CardContent>
@@ -198,60 +183,26 @@ export default function Account() {
             <CardDescription>Your company account details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {profile.company ? (
+            {profile.companyName ? (
               <>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Company Name</div>
-                  <div className="text-base mt-1" data-testid="text-company-name">{profile.company.name}</div>
-                </div>
-                <Separator />
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Legal Name</div>
-                  <div className="text-base mt-1" data-testid="text-company-legal-name">
-                    {profile.company.legalName}
-                  </div>
+                  <div className="text-base mt-1" data-testid="text-company-name">{profile.companyName}</div>
                 </div>
                 <Separator />
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Status</div>
                   <div className="mt-1">
-                    <Badge
-                      variant={getStatusBadgeVariant(profile.company.status)}
-                      data-testid="badge-company-status"
-                    >
-                      {formatStatus(profile.company.status)}
-                    </Badge>
+                    <Badge variant={getStatusBadgeVariant("approved")}>Verified</Badge>
                   </div>
                 </div>
                 <Separator />
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Your Role</div>
                   <div className="mt-1">
-                    <Badge variant="outline" data-testid="badge-role-in-company">
-                      {profile.roleInCompany
-                        ? profile.roleInCompany.charAt(0).toUpperCase() +
-                          profile.roleInCompany.slice(1)
-                        : "Member"}
-                    </Badge>
+                    <Badge variant="outline" data-testid="badge-role-in-company">Member</Badge>
                   </div>
                 </div>
-                {profile.company.website && (
-                  <>
-                    <Separator />
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground">Website</div>
-                      <a
-                        href={profile.company.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline mt-1 inline-block"
-                        data-testid="link-company-website"
-                      >
-                        {profile.company.website}
-                      </a>
-                    </div>
-                  </>
-                )}
               </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
