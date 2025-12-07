@@ -1917,9 +1917,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update order status (admin only)
   app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     try {
-      const { status } = req.body;
+      const { status, trackingNumber } = req.body;
       const updates: any = {};
       if (status) updates.status = status;
+      if (trackingNumber) updates.trackingNumber = trackingNumber;
 
       const order = await storage.updateOrder(req.params.id, updates);
       
@@ -1940,6 +1941,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Update order error:", error);
       res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+
+  // Send re-offer for an order
+  app.post("/api/admin/orders/:id/reoffer", requireAdmin, async (req, res) => {
+    try {
+      const { newPrice, reason } = req.body;
+
+      if (!newPrice || !reason) {
+        return res.status(400).json({ error: "New price and reason are required" });
+      }
+
+      const order = await storage.getOrderById(req.params.id);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Update order with new offer
+      await storage.updateOrder(req.params.id, {
+        reofferAmount: newPrice.toString(),
+        reofferReason: reason,
+        status: "reoffer_sent",
+      });
+
+      // Log the action
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        action: "reoffer_sent",
+        entityType: "order",
+        entityId: req.params.id,
+        newValues: JSON.stringify({ newPrice, reason }),
+      });
+
+      // TODO: Send email notification to customer about re-offer
+
+      res.json({ message: "Re-offer sent successfully" });
+    } catch (error: any) {
+      console.error("Send re-offer error:", error);
+      res.status(500).json({ error: "Failed to send re-offer" });
+    }
+  });
+
+  // Cancel an order
+  app.post("/api/admin/orders/:id/cancel", requireAdmin, async (req, res) => {
+    try {
+      const order = await storage.getOrderById(req.params.id);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      if (order.status === "completed" || order.status === "shipped") {
+        return res.status(400).json({ error: "Cannot cancel completed or shipped orders" });
+      }
+
+      // Update order status to cancelled
+      await storage.updateOrder(req.params.id, {
+        status: "cancelled",
+      });
+
+      // Log the action
+      await storage.createAuditLog({
+        actorUserId: req.session.userId!,
+        action: "order_cancelled",
+        entityType: "order",
+        entityId: req.params.id,
+      });
+
+      // TODO: Process refund if payment was made
+      // TODO: Send email notification to customer
+
+      res.json({ message: "Order cancelled successfully" });
+    } catch (error: any) {
+      console.error("Cancel order error:", error);
+      res.status(500).json({ error: "Failed to cancel order" });
     }
   });
 
