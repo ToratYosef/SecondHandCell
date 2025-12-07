@@ -37,10 +37,9 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  if (showOverlay) {
+  if (showOverlay || !profile) {
     return (
       <div className="relative min-h-screen">
-        {children}
         <AuthOverlay
           title={requiredRole === "admin" ? "Admin access required" : "Sign in to continue"}
           description={
@@ -51,10 +50,6 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
         />
       </div>
     );
-  }
-
-  if (!profile) {
-    return null;
   }
 
   return <>{children}</>;
