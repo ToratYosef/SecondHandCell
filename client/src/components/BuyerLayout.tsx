@@ -15,10 +15,11 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { User as UserType } from "@shared/schema";
 import { BrandLogo } from "@/components/BrandLogo";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const navigation = [
   { name: "Dashboard", href: "/buyer/dashboard", icon: Home },
@@ -42,7 +43,7 @@ export function BuyerLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     try {
-      await apiRequest("POST", "/api/auth/logout");
+      await signOut(auth);
       queryClient.clear();
       setLocation("/login");
       toast({
